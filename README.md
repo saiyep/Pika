@@ -1,4 +1,4 @@
-# WebFunctionCall
+# Pika
 initial Azure function webservice to respond user's call
 
 ## 说明
