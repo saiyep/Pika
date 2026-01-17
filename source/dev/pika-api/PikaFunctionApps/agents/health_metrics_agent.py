@@ -4,7 +4,7 @@ import logging
 import base64
 from typing import Dict, Any
 from .base_agent import BaseAgent
-from ..tools.storage_tool import download_blob_with_key, move_to_processed
+from ..tools.storage_tool import download_blob_with_key
 from ..tools.vision_tool import extract_health_metrics
 from ..tools.notion_tool import create_or_update_health_entry
 from ..core.models import HealthMetrics
@@ -35,9 +35,8 @@ class HealthMetricsAgent(BaseAgent):
                 raise ValueError("Date is required")
             
             # Download image from Azure Blob Storage
-            # Using 'filesystem' as the container name as per the URL structure
-            self.logger.info(f"Downloading image from filesystem container, path: {blob_path}")
-            image_bytes = await download_blob_with_key(storage_key, "filesystem", blob_path)
+            self.logger.info(f"Downloading image from {blob_path}")
+            image_bytes = await download_blob_with_key(storage_key, "data", blob_path)
             
             # Encode image to base64
             image_base64 = base64.b64encode(image_bytes).decode('utf-8')
@@ -50,15 +49,14 @@ class HealthMetricsAgent(BaseAgent):
             self.logger.info("Updating Notion database")
             notion_result = await create_or_update_health_entry(date_str, metrics)
             
-            # Move the processed file to processed folder
-            move_success = await move_to_processed(blob_path, storage_key, "filesystem")
+            # TODO: Move the processed file to processed folder
+            # await move_to_processed(blob_path, storage_key)
             
             return {
                 "original_image_path": blob_path,
                 "date": date_str,
                 "metrics": metrics.dict(),
-                "notion_update_result": notion_result,
-                "moved_to_processed": move_success
+                "notion_update_result": notion_result
             }
         
         except Exception as e:

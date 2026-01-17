@@ -1,91 +1,79 @@
-"""Vision tools for extracting health metrics from images."""
-import logging
-import os
-import re
+"""OpenRouter视觉模型工具"""
 import asyncio
+import base64
+import logging
+from typing import Optional
 from openai import AsyncOpenAI
+from ..core.config import get_required_config
 from ..core.models import HealthMetrics
+from ..core.exceptions import VisionError
+from .storage_tool import download_blob_with_key
 
 
-async def extract_health_metrics(image_base64: str) -> HealthMetrics:
-    """Extract health metrics from an image using OpenRouter's vision model."""
+async def extract_health_metrics(storage_key: str, blob_path: str) -> HealthMetrics:
+    """从图像中提取健康指标"""
     try:
-        # Get API key from environment
-        api_key = os.getenv('OpenRouter_API_Key')
-        if not api_key:
-            raise ValueError("OpenRouter API key not found in environment variables")
+        # 下载图像
+        image_bytes = await download_blob_with_key(storage_key, "data", blob_path)
         
-        # Initialize the OpenAI client with OpenRouter
+        # 将图像转换为base64
+        image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+        
+        # 获取API配置
+        config = get_required_config()
+        api_key = config['openrouter_key']
+        
+        # 使用OpenRouter API
         client = AsyncOpenAI(
             base_url="https://openrouter.ai/api/v1",
-            api_key=api_key,
+            api_key=api_key
         )
         
-        # Prepare the prompt for extracting health metrics
-        prompt = """
-        Analyze this health tracking screenshot and extract the following metrics:
-        - Weight (in 斤 - jin)
-        - Body fat percentage (if available)
-        - Muscle rate (if available)
-        - BMI (if available)
-        
-        Notes:
-        - Weight values in this app are displayed in 斤 (jin), so extract the numerical value as-is without conversion
-        - If some metrics are not available, return null for those fields
-        - Return only the numerical values without units
-        - Pay attention to the exact numbers shown in the image
-        """
-        
-        # Call the vision model
+        # 调用视觉模型
         response = await client.chat.completions.create(
-            model="qwen/qwen-2.5-vl-7b-instruct:free",
+            model="qwen-2.5-vl",
             messages=[
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": prompt},
                         {
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:image/png;base64,{image_base64}"
                             }
+                        },
+                        {
+                            "type": "text",
+                            "text": "请从这张健康监测截图中提取以下信息：体重、体脂率(%)、肌肉率(%)、BMI。以JSON格式返回，例如：{'weight': 70.5, 'body_fat_percentage': 15.2, 'muscle_rate': 45.3, 'bmi': 22.4}"
                         }
                     ]
                 }
             ],
-            max_tokens=500,
-            temperature=0.1
+            response_format={"type": "json_object"}
         )
         
-        # Extract the response content
-        content = response.choices[0].message.content
+        # 解析返回结果
+        result_text = response.choices[0].message.content
+        import json
+        data = json.loads(result_text)
         
-        # Parse the extracted metrics
-        # Look for weight in 斤 (should be present according to our memory)
-        weight_match = re.search(r'weight\D*([0-9.]+)', content.lower())
-        weight = float(weight_match.group(1)) if weight_match else 0.0
+        # 创建健康指标对象
+        weight = data.get('weight', 0)
+        # 将公斤转换为市斤
+        converted_weight = weight * 2 if weight else None
         
-        # Look for body fat percentage
-        body_fat_match = re.search(r'fat\D*([0-9.]+)%', content.lower())
-        body_fat_percentage = float(body_fat_match.group(1)) if body_fat_match else None
-        
-        # Look for muscle rate
-        muscle_rate_match = re.search(r'muscle\D*([0-9.]+)%', content.lower())
-        muscle_rate = float(muscle_rate_match.group(1)) if muscle_rate_match else None
-        
-        # Look for BMI
-        bmi_match = re.search(r'bmi\D*([0-9.]+)', content.lower())
-        bmi = float(bmi_match.group(1)) if bmi_match else None
-        
-        # Create and return the HealthMetrics object
-        return HealthMetrics(
+        health_metrics = HealthMetrics(
             weight=weight,
-            body_fat_percentage=body_fat_percentage,
-            muscle_rate=muscle_rate,
-            bmi=bmi,
-            unit="jin"
+            body_fat_percentage=data.get('body_fat_percentage'),
+            muscle_rate=data.get('muscle_rate'),
+            bmi=data.get('bmi'),
+            weight_unit='kg',
+            converted_weight=converted_weight
         )
-    
+        
+        logging.info(f"成功提取健康指标: {health_metrics}")
+        return health_metrics
+        
     except Exception as e:
-        logging.error(f"Error extracting health metrics: {str(e)}")
-        raise e
+        logging.error(f"提取健康指标失败: {str(e)}")
+        raise VisionError(f"提取健康指标失败: {str(e)}")
