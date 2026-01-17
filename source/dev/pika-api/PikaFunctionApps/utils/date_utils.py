@@ -1,35 +1,43 @@
-"""日期处理工具"""
-from datetime import datetime, date
-from typing import Union
+"""Date utilities for Pika life automation service."""
+
+from datetime import datetime
+import re
 
 
-def parse_date_string(date_str: str) -> date:
-    """解析日期字符串为date对象"""
-    if not date_str:
-        return date.today()
+def parse_date_string(date_str: str) -> datetime:
+    """Parse a date string in various formats to a datetime object."""
+    # Try standard ISO format first
+    try:
+        return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+    except ValueError:
+        pass
     
-    # 尝试多种日期格式
-    formats = [
-        '%Y-%m-%d',  # 2023-01-15
-        '%Y/%m/%d',  # 2023/01/15
-        '%d/%m/%Y',  # 15/01/2023
-        '%d-%m-%Y',  # 15-01-2023
-        '%Y%m%d',    # 20230115
-    ]
+    # Try YYYY-MM-DD format
+    try:
+        return datetime.strptime(date_str, '%Y-%m-%d')
+    except ValueError:
+        pass
     
-    for fmt in formats:
-        try:
-            return datetime.strptime(date_str, fmt).date()
-        except ValueError:
-            continue
+    # Try YYYY/MM/DD format
+    try:
+        return datetime.strptime(date_str, '%Y/%m/%d')
+    except ValueError:
+        pass
     
-    # 如果所有格式都失败，返回今天的日期
-    return date.today()
+    # Try YYYY.MM.DD format
+    try:
+        return datetime.strptime(date_str, '%Y.%m.%d')
+    except ValueError:
+        pass
+    
+    raise ValueError(f"Unable to parse date string: {date_str}")
 
 
-def format_date_for_path(input_date: Union[date, datetime]) -> str:
-    """将日期格式化为路径友好的字符串 YYYYMMDD"""
-    if isinstance(input_date, datetime):
-        input_date = input_date.date()
-    
-    return input_date.strftime('%Y%m%d')
+def format_date_for_filename(dt: datetime) -> str:
+    """Format a datetime object for use in filenames (YYYYMMDD_HHMM)."""
+    return dt.strftime('%Y%m%d_%H%M')
+
+
+def format_date_for_storage(dt: datetime) -> str:
+    """Format a datetime object for Azure Storage path (year/month subfolders)."""
+    return dt.strftime('%Y/%m')

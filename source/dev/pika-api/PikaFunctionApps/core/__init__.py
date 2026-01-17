@@ -1,1 +1,1 @@
-"""Core module initialization"""
+"""Core module for Pika life automation service."""

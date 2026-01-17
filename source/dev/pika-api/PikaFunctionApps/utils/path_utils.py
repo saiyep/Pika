@@ -1,46 +1,32 @@
-"""路径构建工具"""
+"""Path utilities for Pika life automation service."""
+
 import os
 from datetime import datetime
-from typing import Optional
+from .date_utils import format_date_for_storage, format_date_for_filename
 
 
-def build_task_path(task_type: str, date: datetime, filename: str) -> str:
-    """构建任务存储路径"""
-    year = date.strftime('%Y')
-    month = date.strftime('%m')
+def build_blob_path(task_type: str, date_obj: datetime, original_filename: str = None) -> str:
+    """Build a blob path based on task type, date, and optional original filename."""
+    date_path = format_date_for_storage(date_obj)
     
-    return os.path.join(task_type, year, month, filename)
+    if original_filename:
+        # Preserve the original filename but put it in the right date folder
+        # Prepend with 'data/' as per the storage structure
+        return f"data/{task_type}/{date_path}/{original_filename}"
+    else:
+        # Generate a filename based on the current timestamp
+        timestamp = format_date_for_filename(date_obj)
+        extension = ".png"  # Default to png for screenshots
+        return f"data/{task_type}/{date_path}/{timestamp}{extension}"
 
 
-def build_processed_path(original_path: str) -> str:
-    """构建处理后文件的路径"""
-    path_parts = original_path.split(os.sep)
-    if len(path_parts) >= 3:
-        task_type = path_parts[0]
-        filename = path_parts[-1]
-        
-        now = datetime.now()
-        year = str(now.year)
-        month = f"{now.month:02d}"
-        
-        return os.path.join(task_type, "processed", year, month, filename)
-    
-    # 如果路径格式不符合预期，直接在原路径前面加上processed
-    return os.path.join("processed", original_path)
-
-
-def extract_date_from_path(file_path: str) -> Optional[datetime]:
-    """从路径中提取日期信息"""
-    path_parts = file_path.split(os.sep)
-    
-    for part in path_parts:
-        # 查找类似 YYYYMMDD_HHMM 格式的部分
-        if len(part) == 13 and part[8] == '_' and part[4] == part[7] == part[11] == part[12] == part[13] == '':
-            try:
-                date_part = part[:8]  # YYYYMMDD
-                dt = datetime.strptime(date_part, '%Y%m%d')
-                return dt
-            except ValueError:
-                continue
-    
-    return None
+def get_processed_path(original_path: str, task_type: str) -> str:
+    """Get the processed path for a given blob path."""
+    # If the original path starts with 'data/', replace it with '{task_type}/processed/data/'
+    if original_path.startswith('data/'):
+        path_without_data = original_path[5:]  # Remove 'data/' prefix
+        return f"{task_type}/processed/{path_without_data}"
+    else:
+        # Fallback: if not starting with 'data/', just prepend processed path
+        path_parts = original_path.split('/')
+        return f"{task_type}/processed/{'/'.join(path_parts[1:])}"

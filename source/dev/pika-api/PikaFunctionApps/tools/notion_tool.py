@@ -1,74 +1,122 @@
-"""Notion API操作工具"""
-import asyncio
+"""Notion tools for updating health metrics."""
+
 import logging
-from datetime import date
-from typing import Optional
+import os
+import asyncio
+from typing import Dict, Any, Optional
 from notion_client import AsyncClient
-from ..core.config import get_required_config
 from ..core.models import HealthMetrics
-from ..core.exceptions import NotionError
 
 
-async def create_or_update_health_entry(target_date: date, metrics: HealthMetrics) -> dict:
-    """在Notion数据库中创建或更新健康条目"""
+async def create_or_update_health_entry(date_str: str, metrics: HealthMetrics) -> Dict[str, Any]:
+    """Create or update a health metrics entry in Notion database."""
     try:
-        config = get_required_config()
-        api_key = config['notion_api_key']
-        database_id = config['databases']['health_metrics']
+        # Get API key and database ID from environment
+        api_key = os.getenv('Notion_API_Key')
+        database_id = os.getenv('Health_Metrics_Notion_DB_ID')
         
+        if not api_key:
+            raise ValueError("Notion API key not found in environment variables")
+        
+        if not database_id:
+            raise ValueError("Health Metrics Notion DB ID not found in environment variables")
+        
+        # Initialize the Notion client
         notion = AsyncClient(auth=api_key)
         
-        # 格式化日期为Notion接受的格式
-        formatted_date = target_date.isoformat()
+        # Check if an entry for this date already exists
+        existing_pages = await _find_page_by_date(notion, database_id, date_str)
         
-        # 查询是否已存在当天的记录
-        query_result = await notion.databases.query(
-            database_id=database_id,
-            filter={
-                "property": "Date",  # 假设数据库中有一个名为"Date"的属性
-                "date": {
-                    "equals": formatted_date
-                }
-            }
-        )
-        
-        properties = {
-            "Date": {
-                "date": {"start": formatted_date}
-            },
-            "Weight (jin)": {
-                "number": metrics.weight
+        if existing_pages:
+            # Update the existing page
+            page_id = existing_pages[0]['id']
+            response = await _update_existing_page(notion, page_id, metrics, date_str)
+            return {"status": "updated", "page_id": page_id, "response": response}
+        else:
+            # Create a new page
+            response = await _create_new_page(notion, database_id, metrics, date_str)
+            return {"status": "created", "response": response}
+    
+    except Exception as e:
+        logging.error(f"Error in Notion operation: {str(e)}")
+        raise e
+
+
+async def _find_page_by_date(notion: AsyncClient, database_id: str, date_str: str) -> list:
+    """Find pages in the database with the given date."""
+    try:
+        filter_criteria = {
+            "property": "Date",  # Assuming the date property in Notion DB is named "Date"
+            "date": {
+                "equals": date_str
             }
         }
         
-        # 添加可选字段
-        if metrics.body_fat_percentage is not None:
-            properties["Body Fat %"] = {"number": metrics.body_fat_percentage}
+        response = await notion.databases.query(
+            database_id=database_id,
+            filter={"and": [filter_criteria]}
+        )
         
-        if metrics.muscle_rate is not None:
-            properties["Muscle Rate %"] = {"number": metrics.muscle_rate}
+        return response.get("results", [])
+    except Exception as e:
+        logging.error(f"Error finding page by date: {str(e)}")
+        return []
+
+
+async def _update_existing_page(notion: AsyncClient, page_id: str, metrics: HealthMetrics, date_str: str) -> Dict[str, Any]:
+    """Update an existing Notion page with new health metrics."""
+    try:
+        properties = _build_properties(metrics, date_str)
+        response = await notion.pages.update(page_id=page_id, properties=properties)
+        return response
+    except Exception as e:
+        logging.error(f"Error updating existing page: {str(e)}")
+        raise e
+
+
+async def _create_new_page(notion: AsyncClient, database_id: str, metrics: HealthMetrics, date_str: str) -> Dict[str, Any]:
+    """Create a new Notion page with health metrics."""
+    try:
+        properties = _build_properties(metrics, date_str)
         
-        if metrics.bmi is not None:
-            properties["BMI"] = {"number": metrics.bmi}
-        
-        if query_result.get("results"):
-            # 更新现有页面
-            page_id = query_result["results"][0]["id"]
-            response = await notion.pages.update(
-                page_id=page_id,
-                properties=properties
-            )
-            logging.info(f"更新健康数据页面: {page_id}")
-        else:
-            # 创建新页面
-            response = await notion.pages.create(
-                parent={"database_id": database_id},
-                properties=properties
-            )
-            logging.info(f"创建健康数据页面: {response.get('id')}")
+        # Create the new page
+        response = await notion.pages.create(
+            parent={"database_id": database_id},
+            properties=properties
+        )
         
         return response
-    
     except Exception as e:
-        logging.error(f"Notion操作失败: {str(e)}")
-        raise NotionError(f"Notion操作失败: {str(e)}")
+        logging.error(f"Error creating new page: {str(e)}")
+        raise e
+
+
+def _build_properties(metrics: HealthMetrics, date_str: str) -> Dict[str, Any]:
+    """Build the properties dictionary for Notion API."""
+    properties = {
+        "Date": {
+            "date": {
+                "start": date_str
+            }
+        },
+        "Weight": {
+            "number": metrics.weight
+        }
+    }
+    
+    if metrics.body_fat_percentage is not None:
+        properties["Body Fat %"] = {
+            "number": metrics.body_fat_percentage
+        }
+    
+    if metrics.muscle_rate is not None:
+        properties["Muscle Rate %"] = {
+            "number": metrics.muscle_rate
+        }
+    
+    if metrics.bmi is not None:
+        properties["BMI"] = {
+            "number": metrics.bmi
+        }
+    
+    return properties

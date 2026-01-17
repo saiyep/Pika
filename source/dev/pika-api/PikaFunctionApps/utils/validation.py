@@ -1,69 +1,55 @@
-"""数据验证工具"""
+"""Validation utilities for Pika life automation service."""
+
+import re
 from typing import Any, Dict
-from ..core.exceptions import ValidationError
-
-
-def validate_required_fields(data: Dict[str, Any], required_fields: list) -> None:
-    """验证必需字段是否存在"""
-    missing_fields = []
-    
-    for field in required_fields:
-        if field not in data or data[field] is None:
-            missing_fields.append(field)
-    
-    if missing_fields:
-        raise ValidationError(f"缺少必需字段: {', '.join(missing_fields)}")
 
 
 def validate_storage_path(path: str) -> bool:
-    """验证存储路径格式"""
-    if not path or not isinstance(path, str):
+    """Validate that a storage path is well-formed."""
+    if not path or len(path) > 1024:  # Azure Blob Storage has path limits
         return False
     
-    # 检查路径格式是否符合预期 (task_type/year/month/filename)
-    parts = path.split('/')
-    if len(parts) < 3:
+    # Check for invalid characters
+    invalid_chars = ['<', '>', '*', '?' , '%', '&', ':', '@', '+', '/', '\\']
+    if any(char in path for char in invalid_chars):
         return False
     
-    task_type, year, month = parts[0], parts[1], parts[2]
-    
-    # 验证任务类型
-    valid_task_types = ['health', 'running', 'swimming']
-    if task_type not in valid_task_types:
-        return False
-    
-    # 验证年份格式 (YYYY)
-    if not (year.isdigit() and len(year) == 4):
-        return False
-    
-    # 验证月份格式 (MM)
-    if not (month.isdigit() and len(month) == 2 and 1 <= int(month) <= 12):
+    # Path should not start or end with dot or slash
+    if path.startswith('.') or path.startswith('/') or path.endswith('/'):
         return False
     
     return True
 
 
 def validate_date_format(date_str: str) -> bool:
-    """验证日期格式"""
-    if not date_str or not isinstance(date_str, str):
-        return False
-    
-    # 检查是否符合 YYYY-MM-DD 格式
-    import re
+    """Validate that a date string is in YYYY-MM-DD format."""
     pattern = r'^\d{4}-\d{2}-\d{2}$'
     return bool(re.match(pattern, date_str))
 
 
-def clean_input(value: str) -> str:
-    """清理输入值"""
-    if not isinstance(value, str):
-        return value
+def validate_task_type(task_type: str) -> bool:
+    """Validate that a task type is supported."""
+    valid_types = ['health', 'running', 'swimming']
+    return task_type in valid_types
+
+
+def validate_storage_key(key: str) -> bool:
+    """Basic validation of storage key format."""
+    # Storage keys are base64 encoded and typically 88 characters with '=' padding
+    if len(key) < 60:  # Minimum reasonable length
+        return False
     
-    # 去除首尾空白字符
-    cleaned = value.strip()
+    # Should be base64-like format (alphanumeric, +, /, =)
+    pattern = r'^[A-Za-z0-9+/]*={0,2}$'
+    return bool(re.match(pattern, key))
+
+
+def validate_params_structure(params: Dict[str, Any], required_keys: list) -> Dict[str, str]:
+    """Validate that required keys exist in params and return any errors."""
+    errors = {}
     
-    # 防止路径遍历攻击
-    if '..' in cleaned:
-        raise ValidationError("输入包含非法字符")
+    for key in required_keys:
+        if key not in params:
+            errors[key] = f"Required parameter '{key}' is missing"
     
-    return cleaned
+    return errors

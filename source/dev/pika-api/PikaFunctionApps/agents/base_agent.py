@@ -1,23 +1,18 @@
-"""Agent基类定义"""
+"""Base agent class for Pika life automation service."""
+
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
-from pydantic_ai import Agent
+from typing import Dict, Any, Optional
 
 
 class BaseAgent(ABC):
-    """Agent基类"""
+    """Base class for all agents in the Pika service."""
     
-    def __init__(self, system_prompt: str, agent_name: str):
-        self.agent_name = agent_name
-        self.system_prompt = system_prompt
-        self.agent = Agent(
-            "openai",  # 实际上可能是不同的后端，这里使用通用接口
-            system_prompt=system_prompt
-        )
-        self.logger = logging.getLogger(f"Pika.{agent_name}")
+    def __init__(self, name: str):
+        self.name = name
+        self.logger = logging.getLogger(self.__class__.__name__)
     
     @abstractmethod
-    async def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """处理请求的抽象方法"""
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the agent's primary function."""
         pass

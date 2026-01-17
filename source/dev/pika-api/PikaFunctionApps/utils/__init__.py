@@ -1,1 +1,1 @@
-"""Utils module initialization"""
+"""Utils module for Pika life automation service."""

@@ -1,36 +1,26 @@
-"""自定义异常定义"""
+"""Custom exceptions for Pika life automation service."""
 
 
 class PikaException(Exception):
-    """Pika服务基础异常类"""
+    """Base exception for Pika service."""
     pass
 
 
-class AuthenticationError(PikaException):
-    """认证错误"""
+class InvalidTaskTypeException(PikaException):
+    """Raised when an invalid task type is provided."""
     pass
 
 
-class ValidationError(PikaException):
-    """验证错误"""
+class StorageAuthenticationException(PikaException):
+    """Raised when storage authentication fails."""
     pass
 
 
-class ProcessingError(PikaException):
-    """处理错误"""
+class VisionProcessingException(PikaException):
+    """Raised when vision processing fails."""
     pass
 
 
-class StorageError(PikaException):
-    """存储错误"""
-    pass
-
-
-class VisionError(PikaException):
-    """视觉识别错误"""
-    pass
-
-
-class NotionError(PikaException):
-    """Notion操作错误"""
+class NotionUpdateException(PikaException):
+    """Raised when Notion database update fails."""
     pass

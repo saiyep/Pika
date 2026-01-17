@@ -1,24 +1,66 @@
-"""健康数据专业Agent - 已合并到master_agent中，此文件保留用于未来扩展"""
+"""Health metrics agent for Pika life automation service."""
+
+import logging
+import base64
 from typing import Dict, Any
 from .base_agent import BaseAgent
+from ..tools.storage_tool import download_blob_with_key, move_to_processed
+from ..tools.vision_tool import extract_health_metrics
+from ..tools.notion_tool import create_or_update_health_entry
+from ..core.models import HealthMetrics
+from ..core.exceptions import StorageAuthenticationException, VisionProcessingException, NotionUpdateException
 
 
-class HealthMetricsAgentTemplate(BaseAgent):
-    """健康数据专业Agent模板 - 保留供参考"""
+class HealthMetricsAgent(BaseAgent):
+    """Specialized agent for processing health metrics from images."""
     
     def __init__(self):
-        system_prompt = """
-        你是一个专业的健康数据分析器，专门处理健康指标数据。
-        你需要：
-        1. 从图像中提取体重、体脂率、肌肉率、BMI等健康指标
-        2. 将体重从公斤(kg)转换为市斤
-        3. 将数据更新到Notion数据库中
-        4. 返回处理结果
-        """
-        super().__init__(system_prompt, "HealthMetricsAgent")
+        super().__init__("HealthMetricsAgent")
     
-    async def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """处理健康指标数据"""
-        # 此功能已在master_agent.py中实现
-        # 保留此文件用于未来可能的模块分离
-        pass
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute health metrics processing."""
+        try:
+            # Extract parameters
+            storage_key = params.get('storage_key')
+            blob_path = params.get('blob_path')
+            date_str = params.get('date')
+            
+            if not storage_key:
+                raise StorageAuthenticationException("Storage key is required")
+            
+            if not blob_path:
+                raise ValueError("Blob path is required")
+            
+            if not date_str:
+                raise ValueError("Date is required")
+            
+            # Download image from Azure Blob Storage
+            # Using 'filesystem' as the container name as per the URL structure
+            self.logger.info(f"Downloading image from filesystem container, path: {blob_path}")
+            image_bytes = await download_blob_with_key(storage_key, "filesystem", blob_path)
+            
+            # Encode image to base64
+            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+            
+            # Extract health metrics using vision tool
+            self.logger.info("Extracting health metrics from image")
+            metrics = await extract_health_metrics(image_base64)
+            
+            # Update Notion database
+            self.logger.info("Updating Notion database")
+            notion_result = await create_or_update_health_entry(date_str, metrics)
+            
+            # Move the processed file to processed folder
+            move_success = await move_to_processed(blob_path, storage_key, "filesystem")
+            
+            return {
+                "original_image_path": blob_path,
+                "date": date_str,
+                "metrics": metrics.dict(),
+                "notion_update_result": notion_result,
+                "moved_to_processed": move_success
+            }
+        
+        except Exception as e:
+            self.logger.error(f"Error in HealthMetricsAgent: {str(e)}")
+            raise e

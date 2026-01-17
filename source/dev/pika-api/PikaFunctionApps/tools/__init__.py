@@ -1,1 +1,1 @@
-"""Tools module initialization"""
+"""Tools module for Pika life automation service."""

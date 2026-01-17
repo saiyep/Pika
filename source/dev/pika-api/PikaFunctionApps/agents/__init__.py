@@ -1,1 +1,1 @@
-"""Agents module initialization"""
+"""Agents module for Pika life automation service."""

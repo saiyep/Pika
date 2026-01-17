@@ -1,73 +1,91 @@
-"""Azure Storage操作工具"""
-import asyncio
+"""Azure Storage tools for Pika life automation service."""
+
 import logging
-from datetime import datetime
 from typing import Optional
-from azure.storage.blob import BlobServiceClient
-from ..core.config import get_required_config
-from ..core.exceptions import StorageError
+from azure.storage.blob import BlobServiceClient, BlobProperties
+from ..utils.path_utils import build_blob_path, get_processed_path
 
 
 async def download_blob_with_key(storage_key: str, container: str, blob_path: str) -> bytes:
-    """使用存储密钥下载Blob"""
+    """Download a blob from Azure Storage using the provided storage key."""
     try:
-        config = get_required_config()
+        # Get the account name to construct the URL properly
+        from ..core.config import get_config
+        config = get_config()
         account_name = config['storage']['account_name']
         
-        connection_string = f"DefaultEndpointsProtocol=https;AccountName={account_name};AccountKey={storage_key};EndpointSuffix=core.windows.net"
-        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+        # Create a BlobServiceClient using the storage key
+        account_url = f"https://{account_name}.blob.core.windows.net"
+        blob_service_client = BlobServiceClient(
+            account_url=account_url,
+            credential=storage_key
+        )
         
-        blob_client = blob_service_client.get_blob_client(container=container, blob=blob_path)
+        # Get a blob client
+        blob_client = blob_service_client.get_blob_client(
+            container=container, blob=blob_path
+        )
+        
+        # Download the blob content
         download_stream = blob_client.download_blob()
-        
         return download_stream.readall()
+    
     except Exception as e:
-        logging.error(f"下载Blob失败: {str(e)}")
-        raise StorageError(f"下载Blob失败: {str(e)}")
+        logging.error(f"Failed to download blob {blob_path}: {str(e)}")
+        raise e
 
 
-async def move_to_processed(original_path: str, storage_key: str) -> str:
-    """将文件移动到processed目录"""
+async def move_to_processed(original_path: str, storage_key: str, container: str = "filesystem") -> bool:
+    """Move a blob to the processed folder."""
     try:
-        config = get_required_config()
+        # Get the account name to construct the URL properly
+        from ..core.config import get_config
+        config = get_config()
         account_name = config['storage']['account_name']
-        # 假设容器名为"data"
-        container = "data"
         
-        connection_string = f"DefaultEndpointsProtocol=https;AccountName={account_name};AccountKey={storage_key};EndpointSuffix=core.windows.net"
-        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+        # Create a BlobServiceClient using the storage key
+        account_url = f"https://{account_name}.blob.core.windows.net"
+        blob_service_client = BlobServiceClient(
+            account_url=account_url,
+            credential=storage_key
+        )
         
-        # 构建目标路径
+        # Get the original blob client
+        original_blob_client = blob_service_client.get_blob_client(
+            container=container, blob=original_path
+        )
+        
+        # Verify that the original blob exists
+        props = await original_blob_client.get_blob_properties()
+        
+        # Determine the new path in the processed folder
         path_parts = original_path.split('/')
-        task_type = path_parts[0]  # health, running, swimming等
-        original_filename = path_parts[-1]
+        task_type = path_parts[0]  # health, running, swimming, etc.
+        new_path = get_processed_path(original_path, task_type)
         
-        # 获取当前年月
-        now = datetime.now()
-        year = str(now.year)
-        month = f"{now.month:02d}"
+        # Get a client for the destination blob
+        dest_blob_client = blob_service_client.get_blob_client(
+            container=container, blob=new_path
+        )
         
-        # 新路径
-        new_path = f"{task_type}/processed/{year}/{month}/{original_filename}"
+        # Start copying the blob to the new location
+        copy_operation = dest_blob_client.start_copy_from_url(original_blob_client.url)
         
-        # 复制到新位置
-        source_blob = f"https://{account_name}.blob.core.windows.net/{container}/{original_path}"
-        dest_blob_client = blob_service_client.get_blob_client(container=container, blob=new_path)
-        dest_blob_client.start_copy_from_url(source_blob)
+        # Wait for the copy operation to complete
+        # In a real implementation, we might want to handle this asynchronously
+        import time
+        while dest_blob_client.get_blob_properties().copy.status == 'pending':
+            time.sleep(1)
         
-        # 删除原文件
-        source_blob_client = blob_service_client.get_blob_client(container=container, blob=original_path)
-        source_blob_client.delete_blob()
-        
-        logging.info(f"文件已移动: {original_path} -> {new_path}")
-        return new_path
+        # Check if the copy was successful
+        if dest_blob_client.get_blob_properties().copy.status == 'success':
+            # Delete the original blob after copying
+            original_blob_client.delete_blob()
+            return True
+        else:
+            logging.error(f"Failed to copy blob from {original_path} to {new_path}, copy status: {dest_blob_client.get_blob_properties().copy.status}")
+            return False
+            
     except Exception as e:
-        logging.error(f"移动文件失败: {str(e)}")
-        raise StorageError(f"移动文件失败: {str(e)}")
-
-
-def build_blob_path(task_type: str, date: datetime, filename: str) -> str:
-    """构建存储路径"""
-    year = date.strftime('%Y')
-    month = date.strftime('%m')
-    return f"{task_type}/{year}/{month}/{filename}"
+        logging.error(f"Failed to move blob {original_path} to processed folder: {str(e)}")
+        return False

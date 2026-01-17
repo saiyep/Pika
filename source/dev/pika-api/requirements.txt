@@ -6,3 +6,4 @@ azure-storage-blob
 pydantic[email]
 python-dateutil
 pytest-asyncio
+requests

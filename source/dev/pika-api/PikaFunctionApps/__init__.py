@@ -1,46 +1,35 @@
-"""Pika Life Automation Service - Main Entry Point"""
+import azure.functions as func
 import logging
 import json
-import azure.functions as func
-from .core.models import PikaRequest, PikaResponse
+import asyncio
 from .agents.master_agent import MasterAgent
-from .core.exceptions import PikaException
-from .core.security import validate_function_key
 
 
 async def main(req: func.HttpRequest) -> func.HttpResponse:
-    """主函数入口"""
-    logging.info('Pika Life Automation Service function processed a request.')
-    
+    """
+    Azure Function entry point for Pika life automation service
+    Handles both structured and natural language requests
+    Authentication handled by Azure Functions (authLevel: "function")
+    """
+    logging.info('Pika function processed a request.')
+
     try:
-        # 获取请求数据
+        # Parse request body
         req_body = req.get_json()
         
-        # 创建Pika请求对象
-        pika_request = PikaRequest(**req_body)
-        
-        # 初始化MasterAgent并处理请求
+        # Initialize and run MasterAgent
         master_agent = MasterAgent()
-        result = await master_agent.process_request(pika_request)
+        response = await master_agent.process_request(req_body)
         
-        # 返回响应
         return func.HttpResponse(
-            json.dumps(result, ensure_ascii=False, indent=2),
+            json.dumps(response, ensure_ascii=False),
             status_code=200,
             mimetype="application/json"
         )
-        
     except Exception as e:
-        logging.error(f"处理请求时发生错误: {str(e)}")
-        
-        error_response = PikaResponse(
-            success=False,
-            message="请求处理失败",
-            error=str(e)
-        ).model_dump()
-        
+        logging.error(f"Error processing request: {str(e)}")
         return func.HttpResponse(
-            json.dumps(error_response, ensure_ascii=False, indent=2),
+            json.dumps({"error": str(e)}, ensure_ascii=False),
             status_code=500,
             mimetype="application/json"
         )
