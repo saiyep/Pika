@@ -1,0 +1,8 @@
+azure-functions
+pydantic-ai
+openai>=1.0.0
+notion-client
+azure-storage-blob
+pydantic[email]
+python-dateutil
+pytest-asyncio
