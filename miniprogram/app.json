@@ -1,0 +1,17 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/medical/upload/upload",
+    "pages/medical/history/history",
+    "pages/medical/report-detail/report-detail",
+    "pages/medical/metric-trend/metric-trend"
+  ],
+  "window": {
+    "navigationBarTitleText": "Pika 家庭服务",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f5f5f5"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

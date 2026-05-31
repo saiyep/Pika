@@ -1,0 +1,19 @@
+<view class="page">
+  <view wx:if="{{previewPath}}" class="preview">
+    <image src="{{previewPath}}" mode="widthFix" />
+  </view>
+
+  <button class="btn" bindtap="chooseImage">{{previewPath ? '重新选择' : '拍照 / 选择检查单'}}</button>
+  <button wx:if="{{previewPath}}" class="btn primary" bindtap="upload" loading="{{uploading}}" disabled="{{uploading}}">
+    {{uploading ? '识别中…' : '上传并识别'}}
+  </button>
+
+  <view wx:if="{{result}}" class="result">
+    <text class="result-title">{{result.report.report_type_label || '检查单'}}（{{result.report.status === 'parsed' ? '识别成功' : '识别失败'}}）</text>
+    <view wx:for="{{result.metrics}}" wx:key="seq" class="metric {{item.abnormal_flag === 'high' || item.abnormal_flag === 'low' ? 'abnormal' : ''}}">
+      <text class="m-name">{{item.item_name}}</text>
+      <text class="m-value">{{item.value_text}} {{item.unit || ''}}</text>
+      <text class="m-ref">{{item.ref_range || ''}}</text>
+    </view>
+  </view>
+</view>

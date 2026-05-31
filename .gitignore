@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+
+# Env / secrets
+.env
+*.local
+
+# Runtime data (原图 + SQLite，长期保存在 NAS，不入库)
+backend/data/
+*.db
+*.sqlite3
+
+# Node / 小程序
+miniprogram/node_modules/
+dist/
+
+# IDE / OS
+.vs/
+.DS_Store
+Thumbs.db

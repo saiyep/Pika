@@ -1,0 +1,15 @@
+<view class="page">
+  <view wx:if="{{items.length === 0}}" class="empty">暂无检查记录</view>
+  <view wx:for="{{items}}" wx:key="id" class="item" bindtap="goDetail" data-id="{{item.id}}">
+    <view class="row">
+      <text class="type">{{item.report_type_label || item.report_type}}</text>
+      <text class="date">{{item.report_date || '日期未知'}}</text>
+    </view>
+    <view class="row sub">
+      <text class="uploader">上传：{{item.uploader_nickname || '—'}}</text>
+      <text wx:if="{{item.abnormal_count > 0}}" class="abnormal">{{item.abnormal_count}} 项异常</text>
+      <text wx:elif="{{item.status === 'failed'}}" class="failed">识别失败</text>
+      <text wx:else class="normal">正常</text>
+    </view>
+  </view>
+</view>

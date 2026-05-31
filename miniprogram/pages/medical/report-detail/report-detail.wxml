@@ -1,0 +1,25 @@
+<view class="page">
+  <view class="image-wrap">
+    <image src="{{imageUrl}}" mode="widthFix" bindtap="previewImage" />
+  </view>
+
+  <view class="info">
+    <text class="type">{{report.report_type_label || report.report_type}}</text>
+    <text class="date">{{report.report_date || '日期未知'}}</text>
+  </view>
+
+  <view wx:if="{{report.status === 'failed'}}" class="failed-tip">识别失败，原图已保存，可重新上传</view>
+
+  <view class="metrics">
+    <view class="m-head">
+      <text class="c-name">项目</text>
+      <text class="c-value">结果</text>
+      <text class="c-ref">参考范围</text>
+    </view>
+    <view wx:for="{{metrics}}" wx:key="seq" class="m-row {{item.abnormal_flag === 'high' || item.abnormal_flag === 'low' ? 'abnormal' : ''}}">
+      <text class="c-name">{{item.item_name}}</text>
+      <text class="c-value">{{item.value_text}} {{item.unit || ''}}</text>
+      <text class="c-ref">{{item.ref_range || '—'}}</text>
+    </view>
+  </view>
+</view>

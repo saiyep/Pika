@@ -1,0 +1,21 @@
+<view class="page">
+  <view class="header">
+    <text class="title">Pika 家庭服务</text>
+    <text class="subtitle">{{userNickname ? userNickname + '，欢迎回来' : '家庭健康助手'}}</text>
+  </view>
+
+  <view class="module-card" bindtap="goUpload">
+    <text class="card-title">上传检查单</text>
+    <text class="card-desc">拍照或选图，自动识别结果</text>
+  </view>
+
+  <view class="module-card" bindtap="goHistory">
+    <text class="card-title">检查历史</text>
+    <text class="card-desc">查看历次检查记录</text>
+  </view>
+
+  <view class="module-card" bindtap="goTrend">
+    <text class="card-title">指标趋势</text>
+    <text class="card-desc">看某项指标随时间变化</text>
+  </view>
+</view>
