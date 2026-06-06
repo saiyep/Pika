@@ -1,139 +1,33 @@
-# Pika 就医服务 POC v0.1 实施计划（最新）
+# Pika 就医服务 POC v0.1 实施计划
 
-> 本计划只保留当前仍在执行的方案。旧路线、过时假设、废弃逻辑已移除。
+> 实时进度看 `PROJECT_STATUS.md`；本文件定义范围与验收口径。
 
-## 1. 目标
+## 目标
 
-以最小可运行版本验证主链路：
+验证主链路：小程序多图上传 → 后端草稿预解析 → 人工修正 → 提交落库 → 历史/详情/趋势可查（含 hospital）。
 
-小程序多图上传 -> 后端草稿预解析 -> 用户人工修正 -> 确认提交落库 -> 历史/详情/趋势可查看（含 hospital）
+## 本期范围
 
-## 2. 本期范围（必须完成）
+1. `hospital` 全链路贯通（上传/落库/查询/展示）
+2. 一份报告多图（`image_paths`，保留 `image_path` 兼容首图）
+3. 两阶段上传（`report-drafts` 预解析 → `commit`），保留 `POST /reports` 兼容
 
-1. `hospital` 全链路贯通（上传、落库、查询、展示）
-2. 一份报告支持多图（`image_paths`）
-3. 两阶段上传流程（draft -> commit）
+**不做**：成员管理、复杂订阅、公网发布、多图子表化/草稿持久化（均后续）。
 
-## 3. 本期不做（明确排除）
+## 部署要求
 
-- 成员管理与权限细化
-- 复杂订阅体系
-- 公网 HTTPS 正式发布
-- 多图子表化与草稿持久化表（后续再做）
+- 挂载：`/volume1/Projects/Pika/data/uploads/medical` 与 `/data/db` → 容器 `/app/data/...`
+- 环境变量（NAS `.env`）：`WX_APPID/WX_SECRET` + `AZURE_OPENAI_ENDPOINT/API_KEY/API_VERSION/DEPLOYMENT`
+- 迁移：`create_all` 不补旧表列，改字段需删 `pika.db` 重建
 
-## 4. 后端实施
+## 验收标准
 
-### 4.1 数据模型
+1. 多图草稿创建成功
+2. 人工修正后提交成功
+3. DB 可见 `hospital` 与 `image_paths`
+4. 历史/详情/趋势显示 hospital
+5. 真机局域网连续成功 3 次
 
-文件：`backend/app/modules/medical/models.py`
+## 后续（v0.2+）
 
-- `medical_reports` 新增：
-  - `hospital`
-  - `image_paths`（数组）
-- 保留 `image_path` 兼容旧单图读取端点
-
-### 4.2 API
-
-文件：`backend/app/modules/medical/router.py`
-
-新增：
-- `POST /api/medical/report-drafts`
-- `POST /api/medical/report-drafts/{draft_id}/commit`
-
-保留兼容：
-- `POST /api/medical/reports`
-
-查询贯通：
-- `/api/medical/reports`
-- `/api/medical/reports/{id}`
-- `/api/medical/metrics/trend`
-
-都返回 `hospital` 相关字段。
-
-### 4.3 服务层
-
-文件：`backend/app/modules/medical/service.py`
-
-- 拆分为：
-  - `create_draft_from_images(...)`
-  - `commit_draft(...)`
-  - `create_report(...)`（兼容封装）
-- 复用：
-  - `core/storage.py::save_image`
-  - `modules/medical/vision.py::parse_report_image`
-
-### 4.4 Schema
-
-文件：`backend/app/modules/medical/schemas.py`
-
-- 补充 hospital 字段到报告/趋势结构
-- 增加 Draft 相关 schema
-
-## 5. 小程序实施
-
-### 5.1 上传页
-
-文件：
-- `miniprogram/pages/medical/upload/upload.js`
-- `miniprogram/pages/medical/upload/upload.wxml`
-- `miniprogram/pages/medical/upload/upload.wxss`
-
-改动：
-- 支持多图选择
-- 调 draft 接口获取可编辑结果
-- 人工修正后调用 commit 提交
-
-### 5.2 历史 / 详情 / 趋势
-
-文件：
-- `miniprogram/pages/medical/history/history.wxml`
-- `miniprogram/pages/medical/report-detail/report-detail.wxml`
-- `miniprogram/pages/medical/metric-trend/*`
-
-改动：
-- 展示 hospital
-- 趋势按医院来源区分显示
-
-## 6. 部署与运行要求
-
-### 6.1 持久化挂载
-
-- `/volume1/Projects/Pika/data/uploads/medical` -> `/app/data/uploads/medical`
-- `/volume1/Projects/Pika/data/db` -> `/app/data/db`
-
-### 6.2 环境变量（真实值）
-
-- `AZURE_OPENAI_ENDPOINT`
-- `AZURE_OPENAI_API_KEY`
-- `AZURE_OPENAI_API_VERSION`
-- `AZURE_OPENAI_DEPLOYMENT`
-- `WX_APPID`
-- `WX_SECRET`
-
-### 6.3 迁移策略（POC）
-
-当前使用 `create_all`，不会自动给旧表补列。若旧 `pika.db` 缺新字段，直接重建 DB。
-
-## 7. 验收标准
-
-必须全部通过：
-
-1. 草稿创建成功（多图）
-2. 草稿提交成功（人工修正后）
-3. 数据库可见 `hospital` 与 `image_paths`
-4. 历史/详情/趋势能看到 hospital
-5. 真机（局域网）链路可连续成功 3 次
-
-## 8. 当前进度与下一步
-
-已完成：
-- 后端三项核心改造（hospital / 多图 / 草稿两阶段）落地
-- 后端部署到绿联 NAS（`.env` + compose），`/health` 通过
-- Azure `gpt-5.4-mini` 视觉解析实测可用
-
-下一步：
-1. 小程序真机联调（登录→多图上传→草稿编辑→提交→历史/详情/趋势）
-2. 真实单据解析质量调优（prompt + 后处理）
-3. 多图子表化与草稿持久化
-4. 成员管理与共享模型
-5. 公网发布链路
+多图子表化、草稿持久化、成员管理与共享、公网 HTTPS。
