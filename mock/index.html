@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pika 交互原型</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  :root {
+    --green:#07c160; --red:#e64340; --orange:#fa8c16;
+    --ink:#222; --sub:#888; --line:#f0f0f0; --bg:#f5f5f5;
+  }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:#e9ebee; color:var(--ink);
+    display:flex; flex-direction:column; align-items:center;
+    padding:28px 16px 60px; min-height:100vh;
+  }
+  .intro { text-align:center; margin-bottom:18px; }
+  .intro h1 { font-size:20px; color:#1a1a1a; }
+  .intro p { color:#888; font-size:13px; margin-top:4px; }
+
+  /* 手机壳 */
+  .phone {
+    width:360px; height:740px; background:#000; border-radius:44px; padding:11px;
+    box-shadow:0 16px 50px rgba(0,0,0,.28); position:relative;
+  }
+  .screen {
+    width:100%; height:100%; background:var(--bg); border-radius:33px;
+    overflow:hidden; display:flex; flex-direction:column; position:relative;
+  }
+  .statusbar {
+    height:26px; background:#fff; display:flex; align-items:center;
+    justify-content:space-between; padding:0 20px; font-size:12px; flex-shrink:0; font-weight:600;
+  }
+  .navbar {
+    height:50px; background:#fff; display:flex; align-items:center; justify-content:center;
+    position:relative; flex-shrink:0; border-bottom:.5px solid #ececec;
+  }
+  .navbar .title { font-size:17px; font-weight:600; }
+  .navbar .back {
+    position:absolute; left:12px; top:0; bottom:0; display:flex; align-items:center;
+    font-size:24px; color:#000; cursor:pointer; padding:0 8px; opacity:0;
+    pointer-events:none; transition:opacity .15s;
+  }
+  .navbar .back.show { opacity:1; pointer-events:auto; }
+  .body { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; }
+  .body::-webkit-scrollbar { display:none; }
+  .page { display:none; padding:16px; min-height:100%; }
+  .page.active { display:block; animation:fade .2s; }
+  @keyframes fade { from{opacity:0; transform:translateX(8px);} to{opacity:1; transform:none;} }
+
+  /* 底部 Tab 栏 */
+  .tabbar {
+    height:54px; background:#fff; border-top:.5px solid #ececec; display:flex; flex-shrink:0;
+  }
+  .tabbar .tab {
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:10px; color:#999; cursor:pointer; gap:2px;
+  }
+  .tabbar .tab.on { color:var(--green); }
+  .tabbar .tab .ti { font-size:20px; }
+
+  /* 通用 */
+  .card { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.04); }
+  .sec-title { font-size:13px; color:#999; margin:6px 4px 10px; font-weight:600; letter-spacing:.5px; }
+  .green{color:var(--green);} .red{color:var(--red);} .orange{color:var(--orange);}
+  .tag { font-size:11px; padding:2px 8px; border-radius:20px; }
+  .tag.ab { background:#fdecec; color:var(--red); }
+  .tag.ok { background:#e8f8ee; color:var(--green); }
+  .tag.fail { background:#fff3e6; color:var(--orange); }
+  .btn {
+    width:100%; border:none; border-radius:10px; padding:13px; font-size:15px;
+    background:#fff; color:#333; box-shadow:0 1px 4px rgba(0,0,0,.06); cursor:pointer; margin-bottom:12px;
+  }
+  .btn.primary { background:var(--green); color:#fff; box-shadow:none; }
+  .btn.ghost { background:#fff; color:var(--green); box-shadow:inset 0 0 0 1px var(--green); }
+  .btn:active { opacity:.7; }
+
+  /* 首页 */
+  .home-hd { margin:10px 4px 20px; }
+  .home-hd .t { font-size:25px; font-weight:600; }
+  .home-hd .s { font-size:14px; color:var(--sub); margin-top:4px; }
+  .feat {
+    display:flex; align-items:center; padding:16px; margin-bottom:12px; cursor:pointer; position:relative;
+  }
+  .feat:active { background:#fafafa; }
+  .feat .ico {
+    width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg,#07c160,#10d070);
+    display:flex; align-items:center; justify-content:center; font-size:24px; margin-right:14px; flex-shrink:0;
+  }
+  .feat .ico.gray { background:linear-gradient(135deg,#b0b0b0,#cacaca); }
+  .feat .meta { flex:1; }
+  .feat .meta .n { font-size:16px; font-weight:600; }
+  .feat .meta .d { font-size:12px; color:#999; margin-top:3px; }
+  .feat .star { font-size:22px; color:#ddd; cursor:pointer; padding:6px; }
+  .feat .star.on { color:#ffb400; }
+  .feat .soon { font-size:11px; color:#bbb; }
+
+  /* 成员切换器 */
+  .subject-bar { display:flex; gap:8px; padding:4px 2px 16px; overflow-x:auto; }
+  .subject-bar::-webkit-scrollbar{display:none;}
+  .chip {
+    flex-shrink:0; padding:7px 16px; border-radius:20px; background:#fff; font-size:14px;
+    box-shadow:0 1px 4px rgba(0,0,0,.05); cursor:pointer; color:#555;
+  }
+  .chip.on { background:var(--green); color:#fff; }
+
+  /* 服务主页入口 */
+  .entry { display:flex; align-items:center; padding:18px; margin-bottom:12px; cursor:pointer; }
+  .entry:active{background:#fafafa;}
+  .entry .ei { font-size:26px; margin-right:14px; }
+  .entry .et { flex:1; }
+  .entry .et .n{ font-size:16px; font-weight:600;}
+  .entry .et .d{ font-size:12px; color:#999; margin-top:3px;}
+  .entry .arrow{ color:#ccc; font-size:18px; }
+
+  /* "我"页 */
+  .me-hd { display:flex; align-items:center; padding:20px 16px; margin-bottom:16px; }
+  .me-hd .av { width:60px; height:60px; border-radius:50%; background:linear-gradient(135deg,#07c160,#10d070);
+    display:flex; align-items:center; justify-content:center; font-size:28px; color:#fff; margin-right:16px; }
+  .me-hd .nm { font-size:20px; font-weight:600; }
+  .me-hd .id { font-size:12px; color:#999; margin-top:4px; }
+  .me-list .ml { display:flex; align-items:center; padding:16px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .me-list .ml:last-child{ border-bottom:none; }
+  .me-list .ml .mi { font-size:20px; margin-right:14px; width:24px; text-align:center; }
+  .me-list .ml .mt { flex:1; font-size:15px; }
+  .me-list .ml .ma { color:#ccc; font-size:18px; }
+
+  /* 上传 */
+  .step-bar { display:flex; align-items:center; margin-bottom:18px; padding:0 8px; }
+  .step-bar .sp { display:flex; align-items:center; gap:6px; font-size:12px; color:#bbb; }
+  .step-bar .sp .num { width:20px; height:20px; border-radius:50%; background:#e0e0e0; color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:11px; }
+  .step-bar .sp.on { color:var(--green); font-weight:600; }
+  .step-bar .sp.on .num { background:var(--green); }
+  .step-bar .sp.done .num { background:var(--green); }
+  .step-bar .ln { flex:1; height:1px; background:#e0e0e0; margin:0 8px; }
+  .uploader-grid { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
+  .thumb {
+    width:96px; height:96px; border-radius:10px; position:relative; overflow:hidden;
+    background:linear-gradient(135deg,#dfe6e9,#b2bec3); display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:12px;
+  }
+  .thumb .del {
+    position:absolute; top:3px; right:3px; width:20px; height:20px; border-radius:50%;
+    background:rgba(0,0,0,.55); color:#fff; font-size:13px; display:flex; align-items:center;
+    justify-content:center; cursor:pointer;
+  }
+  .thumb .ord {
+    position:absolute; bottom:3px; left:3px; background:rgba(0,0,0,.5); color:#fff;
+    font-size:10px; padding:1px 5px; border-radius:8px;
+  }
+  .thumb.add { background:#fff; border:1.5px dashed #ccc; color:#bbb; font-size:30px; cursor:pointer; }
+  .hint { font-size:12px; color:#999; margin:-6px 2px 16px; line-height:1.5; }
+  .field { margin-bottom:16px; }
+  .field label { display:block; font-size:13px; color:#666; margin-bottom:8px; padding-left:2px; }
+  .field input {
+    width:100%; border:none; background:#fff; border-radius:10px; padding:13px; font-size:15px;
+    box-shadow:0 1px 4px rgba(0,0,0,.05);
+  }
+  .hosp-quick { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .hosp-quick .hq { font-size:12px; padding:5px 12px; border-radius:16px; background:#eef1f3; color:#666; cursor:pointer; }
+  .recognizing { text-align:center; padding:50px 0; }
+  .recognizing .spin { width:40px; height:40px; border:3px solid #e0e0e0; border-top-color:var(--green);
+    border-radius:50%; margin:0 auto 16px; animation:rot .8s linear infinite; }
+  @keyframes rot { to{transform:rotate(360deg);} }
+  .recognizing .rt { font-size:14px; color:#666; }
+  .recognizing .rs { font-size:12px; color:#aaa; margin-top:6px; }
+
+  /* 可编辑结果表 */
+  .edit-note { background:#eef6ff; color:#3a7bd5; font-size:12px; padding:10px 12px; border-radius:8px; margin-bottom:14px; line-height:1.5; }
+  .erow { display:flex; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); gap:8px; }
+  .erow:last-child{ border-bottom:none; }
+  .erow input {
+    border:none; background:#f7f8fa; border-radius:7px; padding:8px 10px; font-size:13px; min-width:0;
+  }
+  .erow .en { flex:2; }
+  .erow .ev { flex:1.3; text-align:right; }
+  .erow .eu { flex:.9; }
+  .erow .er { flex:1.4; }
+  .erow .edel { color:#ccc; font-size:16px; cursor:pointer; flex-shrink:0; }
+  .erow.warn input.ev { background:#fff7e6; box-shadow:inset 0 0 0 1px #ffd591; }
+  .add-metric { text-align:center; color:var(--green); font-size:13px; padding:12px; cursor:pointer; }
+  .miss-flag { font-size:11px; color:var(--orange); margin-left:4px; }
+
+  /* 指标行(详情) */
+  .result { padding:14px 16px; margin-top:8px; }
+  .result .rt { font-size:15px; font-weight:600; margin-bottom:4px; }
+  .result .rmeta { font-size:12px; color:#999; margin-bottom:10px; }
+  .mrow { display:flex; align-items:center; padding:11px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .mrow:last-child{ border-bottom:none; }
+  .mrow .mn { flex:2; color:#333; }
+  .mrow .mv { flex:1.3; text-align:right; }
+  .mrow .mr { flex:1.6; text-align:right; color:#999; font-size:12px; }
+  .mrow.ab .mv { color:var(--red); font-weight:700; }
+
+  /* 历史 */
+  .filter-bar { display:flex; gap:8px; margin-bottom:14px; overflow-x:auto; padding-bottom:2px; }
+  .filter-bar::-webkit-scrollbar{display:none;}
+  .fchip {
+    flex-shrink:0; padding:7px 14px; border-radius:18px; background:#fff; font-size:13px; color:#555;
+    box-shadow:0 1px 4px rgba(0,0,0,.05); cursor:pointer; display:flex; align-items:center; gap:4px;
+  }
+  .fchip.on { background:var(--green); color:#fff; }
+  .fchip .fa { font-size:10px; opacity:.7; }
+  .hist { padding:14px 16px; margin-bottom:12px; cursor:pointer; }
+  .hist:active{background:#fafafa;}
+  .hrow { display:flex; justify-content:space-between; align-items:center; }
+  .hrow.sub { margin-top:9px; }
+  .hist .ty { font-size:16px; font-weight:600; }
+  .hist .dt { font-size:13px; color:#888; }
+  .hosp-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+  .hist .hosp { font-size:12px; color:#666; }
+
+  /* 详情图片 */
+  .detail-imgs { display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; margin-bottom:14px; }
+  .detail-imgs::-webkit-scrollbar{display:none;}
+  .dimg {
+    width:150px; height:200px; flex-shrink:0; border-radius:10px; overflow:hidden;
+    background:linear-gradient(135deg,#dfe6e9,#b2bec3); display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:13px; position:relative;
+  }
+  .dimg .pg{ position:absolute; bottom:6px; right:8px; background:rgba(0,0,0,.5); padding:2px 8px; border-radius:10px; font-size:11px;}
+  .info-line { display:flex; justify-content:space-between; align-items:center; margin:0 2px 14px; }
+  .info-line .ty { font-size:19px; font-weight:600; }
+  .info-line .rt { font-size:13px; color:#888; }
+  .failtip { background:#fff7e6; color:var(--orange); font-size:13px; padding:11px; border-radius:8px; margin-bottom:14px; }
+  .mtable { padding:4px 16px; }
+  .mhead { display:flex; padding:10px 0; font-size:12px; color:#999; border-bottom:1px solid var(--line); }
+  .mhead .mn{flex:2;} .mhead .mv{flex:1.3; text-align:right;} .mhead .mr{flex:1.6; text-align:right;}
+
+  /* 趋势 */
+  .seg { display:flex; background:#e4e6e9; border-radius:10px; padding:3px; margin-bottom:14px; }
+  .seg .opt { flex:1; text-align:center; padding:8px; font-size:14px; border-radius:8px; cursor:pointer; color:#666; }
+  .seg .opt.on { background:#fff; color:#000; font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; gap:10px; }
+  .picker2 {
+    flex:1; background:#fff; border-radius:10px; padding:12px 14px; font-size:15px;
+    display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 4px rgba(0,0,0,.05); cursor:pointer;
+  }
+  .switch { display:flex; align-items:center; gap:7px; font-size:12px; color:#666; flex-shrink:0; }
+  .toggle { width:38px; height:22px; border-radius:11px; background:#ccc; position:relative; cursor:pointer; transition:.2s; flex-shrink:0; }
+  .toggle.on { background:var(--green); }
+  .toggle::after { content:''; position:absolute; width:18px; height:18px; border-radius:50%; background:#fff; top:2px; left:2px; transition:.2s; }
+  .toggle.on::after { left:18px; }
+  .chart-card { padding:16px; }
+  .chart-card .ct { font-size:15px; font-weight:600; margin-bottom:4px; }
+  .chart-card .cs { font-size:12px; color:#999; margin-bottom:12px; }
+  canvas { width:100%; height:200px; display:block; }
+  .legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+  .legend .lg { font-size:12px; color:#666; display:flex; align-items:center; gap:5px; }
+  .legend .ld { width:11px; height:11px; border-radius:50%; }
+  .tlist { padding:4px 16px; }
+  .tlhead { display:flex; padding:10px 0; font-size:12px; color:#999; border-bottom:1px solid var(--line); }
+  .tlhead .c1{flex:1.3;} .tlhead .c2{flex:1; text-align:right;} .tlhead .c3{flex:1.4; text-align:right;} .tlhead .c4{flex:1.4; text-align:right;}
+  .tlrow { display:flex; align-items:center; padding:12px 0; font-size:13px; border-bottom:1px solid var(--line); }
+  .tlrow:last-child{border-bottom:none;}
+  .tlrow .c1{flex:1.3; color:#555;} .tlrow .c2{flex:1; text-align:right; font-weight:600;}
+  .tlrow .c3{flex:1.4; text-align:right; color:#999; font-size:12px;}
+  .tlrow .c4{flex:1.4; text-align:right; display:flex; align-items:center; justify-content:flex-end; gap:4px; font-size:12px; color:#666;}
+  .tlrow.ab .c2{ color:var(--red); }
+
+  .empty { text-align:center; color:#bbb; padding:60px 0; font-size:14px; }
+
+  /* 底部弹出选择器(小程序 picker 风格) */
+  .sheet-mask {
+    position:absolute; inset:0; background:rgba(0,0,0,.4); display:none; z-index:50;
+    align-items:flex-end; border-radius:33px; overflow:hidden;
+  }
+  .sheet-mask.show { display:flex; animation:fade .2s; }
+  .sheet { width:100%; background:#fff; border-radius:16px 16px 0 0; max-height:60%; overflow-y:auto;
+    animation:rise .25s; }
+  @keyframes rise { from{transform:translateY(100%);} to{transform:none;} }
+  .sheet .sh-hd { display:flex; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--line);
+    position:sticky; top:0; background:#fff; font-size:15px; }
+  .sheet .sh-hd .ok { color:var(--green); }
+  .sheet .sh-hd .cancel { color:#999; }
+  .sheet .opt-row { padding:14px 18px; font-size:15px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; border-bottom:1px solid #f7f7f7; }
+  .sheet .opt-row.on { color:var(--green); font-weight:600; }
+  .sheet .opt-row .cnt { font-size:12px; color:#aaa; }
+</style>
+</head>
+<body>
+  <div class="intro">
+    <h1>Pika 家庭服务 · 交互原型</h1>
+    <p>底部 Tab 切换。上传走"识别→修改→提交"。历史可筛选。趋势用小程序内下拉。数据均为模拟。</p>
+  </div>
+
+  <div class="phone"><div class="screen">
+    <div class="statusbar"><span>9:41</span><span>📶 5G 🔋</span></div>
+    <div class="navbar">
+      <div class="back" id="backBtn" onclick="goBack()">‹</div>
+      <div class="title" id="navTitle">Pika</div>
+    </div>
+    <div class="body" id="body"></div>
+    <!-- 底部弹出选择器 -->
+    <div class="sheet-mask" id="sheetMask" onclick="closeSheet(event)">
+      <div class="sheet" id="sheet" onclick="event.stopPropagation()"></div>
+    </div>
+    <!-- 底部 Tab -->
+    <div class="tabbar" id="tabbar"></div>
+  </div></div>
+
+<script>
+/* ============ MOCK 数据 ============ */
+const MEMBERS = [ {id:1,name:'我'}, {id:2,name:'岳母'}, {id:3,name:'女儿'} ];
+let currentSubject = 2;
+
+const HOSPITALS = { '协和医院':'#4a90d9','人民医院':'#e67e22','中医院':'#9b59b6','社区卫生站':'#16a085' };
+const hospColor = h => HOSPITALS[h] || '#888';
+
+const ALL_FEATURES = [
+  { key:'medical', name:'就医服务', desc:'检查单上传 · 历史追踪 · 指标趋势', icon:'🏥', ready:true },
+  { key:'med',     name:'用药提醒', desc:'按时吃药 · 复诊提醒(即将上线)', icon:'💊', ready:false },
+  { key:'bill',    name:'家庭账本', desc:'共享记账(即将上线)', icon:'📒', ready:false },
+];
+let favorites = ['medical'];
+
+const REPORTS = {
+  2: [
+    { id:101, type:'血常规', date:'2026-05-30', hospital:'协和医院', uploader:'岳母', status:'parsed', images:3,
+      metrics:[
+        {name:'白细胞计数',code:'WBC',value:6.2,unit:'10⁹/L',ref:'3.5-9.5',low:3.5,high:9.5,flag:'normal'},
+        {name:'血红蛋白',code:'HGB',value:98,unit:'g/L',ref:'115-150',low:115,high:150,flag:'low'},
+        {name:'血小板',code:'PLT',value:210,unit:'10⁹/L',ref:'125-350',low:125,high:350,flag:'normal'},
+        {name:'红细胞计数',code:'RBC',value:3.1,unit:'10¹²/L',ref:'3.8-5.1',low:3.8,high:5.1,flag:'low'},
+      ]},
+    { id:102, type:'血常规', date:'2026-04-12', hospital:'人民医院', uploader:'我', status:'parsed', images:1,
+      metrics:[
+        {name:'白细胞计数',code:'WBC',value:7.0,unit:'10⁹/L',ref:'4.0-10.0',low:4.0,high:10.0,flag:'normal'},
+        {name:'血红蛋白',code:'HGB',value:105,unit:'g/L',ref:'110-160',low:110,high:160,flag:'low'},
+        {name:'血小板',code:'PLT',value:230,unit:'10⁹/L',ref:'100-300',low:100,high:300,flag:'normal'},
+      ]},
+    { id:103, type:'肝功能', date:'2026-03-08', hospital:'协和医院', uploader:'岳母', status:'parsed', images:2,
+      metrics:[
+        {name:'谷丙转氨酶',code:'ALT',value:52,unit:'U/L',ref:'7-40',low:7,high:40,flag:'high'},
+        {name:'谷草转氨酶',code:'AST',value:38,unit:'U/L',ref:'13-35',low:13,high:35,flag:'high'},
+      ]},
+    { id:104, type:'血常规', date:'2026-02-20', hospital:'中医院', uploader:'岳母', status:'parsed', images:1,
+      metrics:[
+        {name:'白细胞计数',code:'WBC',value:5.5,unit:'10⁹/L',ref:'3.5-9.5',low:3.5,high:9.5,flag:'normal'},
+        {name:'血红蛋白',code:'HGB',value:118,unit:'g/L',ref:'113-151',low:113,high:151,flag:'normal'},
+      ]},
+    { id:105, type:'尿常规', date:'2026-01-15', hospital:'社区卫生站', uploader:'岳母', status:'parsed', images:1,
+      metrics:[ {name:'尿蛋白',code:'PRO',value:0,unit:'',ref:'阴性',low:null,high:null,flag:'normal',valueText:'阴性'} ]},
+  ],
+  1: [
+    { id:201, type:'血常规', date:'2026-05-01', hospital:'人民医院', uploader:'我', status:'parsed', images:1,
+      metrics:[
+        {name:'白细胞计数',code:'WBC',value:6.8,unit:'10⁹/L',ref:'3.5-9.5',low:3.5,high:9.5,flag:'normal'},
+        {name:'血红蛋白',code:'HGB',value:152,unit:'g/L',ref:'130-175',low:130,high:175,flag:'normal'},
+      ]},
+  ],
+  3: [],
+};
+let watched = { 2:['HGB','ALT'], 1:['HGB'], 3:[] };
+
+/* ============ 导航 ============ */
+const NAV = {
+  home:{title:'Pika',back:false,tab:'home'},
+  me:{title:'我',back:false,tab:'me'},
+  medical:{title:'就医服务',back:true,tab:'home'},
+  upload:{title:'上传检查单',back:true,tab:'home'},
+  history:{title:'检查历史',back:true,tab:'home'},
+  detail:{title:'检查详情',back:true,tab:'home'},
+  trend:{title:'指标趋势',back:true,tab:'home'},
+};
+const TABS = [
+  {key:'home', page:'home', icon:'🏠', label:'主页'},
+  {key:'me', page:'me', icon:'👤', label:'我'},
+];
+let stack = ['home'];
+let detailReportId=null, trendKey=null, trendMode='chart';
+// 历史筛选
+let histFilter = { time:'all', type:'all', hosp:'all', from:'', to:'' };
+
+function nav(page,opts={}){
+  if(opts.replace) stack[stack.length-1]=page; else stack.push(page);
+  if(opts.reportId) detailReportId=opts.reportId;
+  render();
+}
+function goBack(){ if(stack.length>1){ stack.pop(); render(); } }
+function switchTab(page){ stack=[page]; render(); }
+
+function render(){
+  const page = stack[stack.length-1];
+  document.getElementById('navTitle').textContent = NAV[page].title;
+  document.getElementById('backBtn').classList.toggle('show', NAV[page].back);
+  document.getElementById('body').innerHTML = PAGES[page]();
+  // tab 高亮
+  const activeTab = NAV[page].tab;
+  document.getElementById('tabbar').innerHTML = TABS.map(t=>`
+    <div class="tab ${t.key===activeTab?'on':''}" onclick="switchTab('${t.page}')">
+      <span class="ti">${t.icon}</span><span>${t.label}</span>
+    </div>`).join('');
+  if(page==='trend') requestAnimationFrame(drawTrend);
+}
+
+/* ============ 工具 ============ */
+const subjectName = id => (MEMBERS.find(m=>m.id===id)||{}).name||'';
+function abnormalCount(r){ return r.metrics.filter(m=>m.flag==='high'||m.flag==='low').length; }
+function allReports(){ return (REPORTS[currentSubject]||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')); }
+function filteredReports(){
+  let rs = allReports();
+  if(histFilter.type!=='all') rs=rs.filter(r=>r.type===histFilter.type);
+  if(histFilter.hosp!=='all') rs=rs.filter(r=>r.hospital===histFilter.hosp);
+  if(histFilter.time!=='all'){
+    let cut, end;
+    if(histFilter.time==='custom'){
+      cut = histFilter.from || '0000-00';
+      end = histFilter.to || '9999-99';
+    } else {
+      const months = histFilter.time==='3m'?3:histFilter.time==='6m'?6:12;
+      cut = new Date(2026,4-months+1,1).toISOString().slice(0,7);
+      end = '9999-99';
+    }
+    rs=rs.filter(r=>r.date && r.date.slice(0,7)>=cut && r.date.slice(0,7)<=end);
+  }
+  return rs;
+}
+function catalog(){
+  const map={};
+  (REPORTS[currentSubject]||[]).forEach(r=>r.metrics.forEach(m=>{
+    const k=m.code||m.name;
+    if(!map[k]) map[k]={code:m.code,name:m.name,unit:m.unit,low:m.low,high:m.high,count:0};
+    map[k].count++;
+  }));
+  return Object.values(map);
+}
+// 关注的指标排在前面
+function sortedCatalog(){
+  const w=watched[currentSubject]||[];
+  return catalog().slice().sort((a,b)=>{
+    const aw=w.includes(a.code||a.name), bw=w.includes(b.code||b.name);
+    if(aw!==bw) return aw?-1:1;
+    return 0;
+  });
+}
+function trendPoints(key){
+  const pts=[];
+  (REPORTS[currentSubject]||[]).forEach(r=>{
+    if(!r.date) return;
+    r.metrics.forEach(m=>{ if((m.code||m.name)===key) pts.push({date:r.date,value:m.value,flag:m.flag,hospital:r.hospital,ref:m.ref,low:m.low,high:m.high}); });
+  });
+  return pts.sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+/* ============ 页面 ============ */
+const PAGES={};
+
+PAGES.home = () => {
+  const favFeats = ALL_FEATURES.filter(f=>favorites.includes(f.key));
+  const renderFeat = f => `
+    <div class="card feat" onclick="${f.ready?`enterFeature('${f.key}')`:''}">
+      <div class="ico ${f.ready?'':'gray'}">${f.icon}</div>
+      <div class="meta"><div class="n">${f.name}</div><div class="d">${f.desc}</div></div>
+      ${f.ready
+        ? `<div class="star ${favorites.includes(f.key)?'on':''}" onclick="event.stopPropagation();toggleFav('${f.key}')">${favorites.includes(f.key)?'★':'☆'}</div>`
+        : `<div class="soon">敬请期待</div>`}
+    </div>`;
+  return `
+    <div class="home-hd"><div class="t">你好,${subjectName(2)}</div><div class="s">今天也要照顾好家人健康</div></div>
+    ${favFeats.length?`<div class="sec-title">我关注的</div>${favFeats.map(renderFeat).join('')}`:''}
+    <div class="sec-title">全部功能</div>
+    ${ALL_FEATURES.map(renderFeat).join('')}
+  `;
+};
+
+PAGES.me = () => {
+  return `
+    <div class="card me-hd">
+      <div class="av">👤</div>
+      <div><div class="nm">${subjectName(2)}</div><div class="id">微信已绑定 · 家庭成员 ${MEMBERS.length} 人</div></div>
+    </div>
+    <div class="card" style="padding:18px 16px;">
+      <div style="font-size:15px; font-weight:600; margin-bottom:6px;">关于 Pika</div>
+      <div style="font-size:13px; color:#888; line-height:1.7;">
+        Pika 是一个自托管在家庭 NAS 上的家庭服务平台,首个模块为「就医服务」——帮家人把检查单拍照上传、自动识别结构化、按时间追踪指标趋势。数据保存在你自己家的服务器,不上传第三方。
+      </div>
+      <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--line); display:flex; justify-content:space-between; font-size:13px; color:#999;">
+        <span>当前版本</span><span>v0.1.0 (POC)</span>
+      </div>
+    </div>
+  `;
+};
+
+PAGES.medical = () => {
+  return `
+    <div class="sec-title">看谁的检查</div>
+    <div class="subject-bar">
+      ${MEMBERS.map(m=>`<div class="chip ${m.id===currentSubject?'on':''}" onclick="switchSubject(${m.id})">${m.name}</div>`).join('')}
+    </div>
+    <div class="card entry" onclick="startUpload()">
+      <div class="ei">📷</div><div class="et"><div class="n">上传检查单</div><div class="d">拍照或选图,支持多张合成一份</div></div><div class="arrow">›</div>
+    </div>
+    <div class="card entry" onclick="nav('history')">
+      <div class="ei">📋</div><div class="et"><div class="n">检查历史</div><div class="d">${(REPORTS[currentSubject]||[]).length} 份记录</div></div><div class="arrow">›</div>
+    </div>
+    <div class="card entry" onclick="nav('trend')">
+      <div class="ei">📈</div><div class="et"><div class="n">指标趋势</div><div class="d">看某项指标随时间变化</div></div><div class="arrow">›</div>
+    </div>
+  `;
+};
+
+/* ====== 上传:三步流程 ====== */
+let uploadStep = 1;       // 1选图 2识别中 3编辑确认
+let uploadImgs = [1,2];
+let uploadHospital = '';
+let uploadDate = '2026-05-30';
+let editMetrics = [];     // 识别后可编辑的指标
+let editType = '血常规';
+
+function startUpload(){ uploadStep=1; uploadImgs=[1,2]; uploadHospital=''; nav('upload'); }
+
+PAGES.upload = () => {
+  const steps = `
+    <div class="step-bar">
+      <div class="sp ${uploadStep>=1?(uploadStep>1?'done':'on'):''}"><span class="num">1</span>选图</div>
+      <div class="ln"></div>
+      <div class="sp ${uploadStep>=2?(uploadStep>2?'done':'on'):''}"><span class="num">2</span>识别</div>
+      <div class="ln"></div>
+      <div class="sp ${uploadStep>=3?'on':''}"><span class="num">3</span>确认</div>
+    </div>`;
+
+  if(uploadStep===1){
+    const quick=['协和医院','人民医院','中医院','社区卫生站'];
+    return steps+`
+      <div class="sec-title">检查单照片(可多张,按顺序合成一份)</div>
+      <div class="uploader-grid">
+        ${uploadImgs.map((_,i)=>`<div class="thumb">📄 第${i+1}张<div class="del" onclick="delImg(${i})">✕</div><div class="ord">${i+1}</div></div>`).join('')}
+        <div class="thumb add" onclick="addImg()">＋</div>
+      </div>
+      <div class="hint">长截图分成了几段?第一张只截了一半?都加进来,系统按顺序当成同一份检查单识别。</div>
+      <div class="field"><label>检查日期</label><input value="${uploadDate}" oninput="uploadDate=this.value"/></div>
+      <div class="field"><label>医院来源</label>
+        <input id="hospInput" placeholder="填写或点下方选择" value="${uploadHospital}" oninput="uploadHospital=this.value"/>
+        <div class="hosp-quick">${quick.map(h=>`<div class="hq" onclick="pickHosp('${h}')">${h}</div>`).join('')}</div>
+      </div>
+      <button class="btn primary" onclick="recognize()">下一步:自动识别(${uploadImgs.length} 张)</button>
+    `;
+  }
+  if(uploadStep===2){
+    return steps+`
+      <div class="recognizing">
+        <div class="spin"></div>
+        <div class="rt">正在识别 ${uploadImgs.length} 张检查单…</div>
+        <div class="rs">AI 正在提取指标、数值、参考范围</div>
+      </div>`;
+  }
+  // step 3:可编辑确认
+  return steps+`
+    <div class="edit-note">✓ 已自动识别。<b>请核对下方结果</b>,识别错的可直接改,漏掉的可手动加,确认无误再提交。标黄的是 AI 不确定的项。</div>
+    <div class="field" style="margin-bottom:12px;"><label>报告类型</label>
+      <div class="picker2" style="box-shadow:0 1px 4px rgba(0,0,0,.05);" onclick="openTypePicker()">
+        <span>${editType}</span><span style="color:#999">▾</span>
+      </div>
+    </div>
+    <div class="card" style="padding:6px 0; margin-bottom:14px;">
+      ${editMetrics.map((m,i)=>`
+        <div class="erow ${m.uncertain?'warn':''}">
+          <input class="en" value="${m.name}" placeholder="项目名" oninput="editMetrics[${i}].name=this.value"/>
+          <input class="ev" value="${m.value}" placeholder="结果" oninput="editMetrics[${i}].value=this.value"/>
+          <input class="eu" value="${m.unit}" placeholder="单位" oninput="editMetrics[${i}].unit=this.value"/>
+          <input class="er" value="${m.ref}" placeholder="参考" oninput="editMetrics[${i}].ref=this.value"/>
+          <span class="edel" onclick="delMetric(${i})">✕</span>
+        </div>`).join('')}
+      <div class="add-metric" onclick="addMetric()">＋ 手动添加一项指标</div>
+    </div>
+    <button class="btn primary" onclick="submitReport()">确认无误,提交保存</button>
+    <button class="btn ghost" onclick="uploadStep=1;render()">返回重新选图</button>
+  `;
+};
+
+function recognize(){
+  uploadStep=2; render();
+  setTimeout(()=>{
+    // mock 识别结果:含一个"不确定"项 + 一个漏识别(空值)项,让用户体验修改
+    editType='血常规';
+    editMetrics=[
+      {name:'白细胞计数',value:'6.2',unit:'10⁹/L',ref:'3.5-9.5',uncertain:false},
+      {name:'血红蛋白',value:'98',unit:'g/L',ref:'115-150',uncertain:false},
+      {name:'血小板',value:'21O',unit:'10⁹/L',ref:'125-350',uncertain:true}, // 故意 O 误识别成字母
+      {name:'红细胞计数',value:'',unit:'10¹²/L',ref:'3.8-5.1',uncertain:true}, // 漏识别值
+    ];
+    uploadStep=3; render();
+  },1400);
+}
+function addMetric(){ editMetrics.push({name:'',value:'',unit:'',ref:'',uncertain:false}); render(); }
+function delMetric(i){ editMetrics.splice(i,1); render(); }
+function submitReport(){
+  alert('（原型）已提交保存为一份'+editType+'报告,含 '+editMetrics.length+' 项指标、'+uploadImgs.length+' 张原图,医院:'+(uploadHospital||'未填')+'。\n\n真实版会落库并回到历史列表。');
+  stack=['home','medical','history']; render();
+}
+
+PAGES.history = () => {
+  const rs = filteredReports();
+  const types=['all',...new Set(allReports().map(r=>r.type))];
+  const hosps=['all',...new Set(allReports().map(r=>r.hospital))];
+  const timeOpts=[['all','全部时间'],['3m','近3月'],['6m','近半年'],['12m','近1年']];
+  const typeLabel = histFilter.type==='all'?'类型':histFilter.type;
+  const hospLabel = histFilter.hosp==='all'?'医院':histFilter.hosp;
+  const timeLabel = histFilter.time==='custom'
+    ? `${histFilter.from||'起'}~${histFilter.to||'今'}`
+    : (timeOpts.find(t=>t[0]===histFilter.time)||['','时间'])[1];
+  const list = rs.length ? rs.map(r=>{
+    const ab=abnormalCount(r);
+    const st = r.status==='failed'?`<span class="tag fail">识别失败</span>`:(ab>0?`<span class="tag ab">${ab} 项异常</span>`:`<span class="tag ok">正常</span>`);
+    return `<div class="card hist" onclick="nav('detail',{reportId:${r.id}})">
+      <div class="hrow"><span class="ty">${r.type}</span><span class="dt">${r.date||'日期未知'}</span></div>
+      <div class="hrow sub"><span class="hosp"><span class="hosp-dot" style="background:${hospColor(r.hospital)}"></span>${r.hospital} · ${r.images>1?r.images+'张':'1张'}</span>${st}</div>
+    </div>`;
+  }).join('') : `<div class="empty">没有符合筛选条件的记录</div>`;
+  return `
+    <div class="filter-bar">
+      <div class="fchip ${histFilter.time!=='all'?'on':''}" onclick="openFilter('time')">${timeLabel} <span class="fa">▾</span></div>
+      <div class="fchip ${histFilter.type!=='all'?'on':''}" onclick="openFilter('type')">${typeLabel} <span class="fa">▾</span></div>
+      <div class="fchip ${histFilter.hosp!=='all'?'on':''}" onclick="openFilter('hosp')">${hospLabel} <span class="fa">▾</span></div>
+      ${(histFilter.time!=='all'||histFilter.type!=='all'||histFilter.hosp!=='all')?`<div class="fchip" onclick="resetFilter()">✕ 清除</div>`:''}
+    </div>
+    ${list}
+  `;
+};
+
+PAGES.detail = () => {
+  const r=(REPORTS[currentSubject]||[]).find(x=>x.id===detailReportId);
+  if(!r) return `<div class="empty">未找到记录</div>`;
+  const imgs=Array.from({length:r.images},(_,i)=>`<div class="dimg">📄 原图<div class="pg">${i+1}/${r.images}</div></div>`).join('');
+  const failTip=r.status==='failed'?`<div class="failtip">识别失败,原图已保存,可重新上传</div>`:'';
+  const rows=r.metrics.length?r.metrics.map(m=>`
+    <div class="mrow ${m.flag==='high'||m.flag==='low'?'ab':''}">
+      <span class="mn">${m.name}</span><span class="mv">${m.valueText||m.value} ${m.unit}</span><span class="mr">${m.ref}</span>
+    </div>`).join(''):`<div class="empty" style="padding:30px 0;">无识别结果</div>`;
+  return `
+    <div class="detail-imgs">${imgs}</div>
+    <div class="info-line"><span class="ty">${r.type}</span><span class="rt"><span class="hosp-dot" style="background:${hospColor(r.hospital)}"></span>${r.hospital} · ${r.date||'日期未知'}</span></div>
+    ${failTip}
+    <div class="card mtable"><div class="mhead"><span class="mn">项目</span><span class="mv">结果</span><span class="mr">参考范围</span></div>${rows}</div>
+  `;
+};
+
+PAGES.trend = () => {
+  const cat=sortedCatalog();
+  if(!cat.length) return `<div class="empty">${subjectName(currentSubject)}暂无可展示的指标</div>`;
+  if(!trendKey||!cat.find(c=>(c.code||c.name)===trendKey)) trendKey=cat[0].code||cat[0].name;
+  const cur=cat.find(c=>(c.code||c.name)===trendKey);
+  const isW=(watched[currentSubject]||[]).includes(trendKey);
+  const pts=trendPoints(trendKey);
+  const hosps=[...new Set(pts.map(p=>p.hospital))];
+  // 参考范围是否跨医院不一致
+  const refSet=[...new Set(pts.map(p=>`${p.low}-${p.high}`))];
+  const refVaries = refSet.length>1;
+  const latest = pts[pts.length-1];
+  const body = trendMode==='chart'?`
+    <div class="card chart-card">
+      <div class="ct">${cur.name} ${cur.unit?'('+cur.unit+')':''}</div>
+      <div class="cs">参考范围 ${latest?latest.low+'-'+latest.high:''}${refVaries?'(按最近一次画带,各院不同)':''} · 共 ${pts.length} 次</div>
+      <canvas id="tc" width="600" height="400"></canvas>
+      <div class="legend">
+        <div class="lg"><span class="ld" style="background:rgba(7,193,96,.18)"></span>参考范围带(最近一次)</div>
+        <div class="lg"><span class="ld" style="background:#e64340"></span>超出最近参考范围(数字红)</div>
+        ${hosps.map(h=>`<div class="lg"><span class="ld" style="background:${hospColor(h)}"></span>${h}</div>`).join('')}
+      </div>
+      ${refVaries?`<div class="hint" style="margin:12px 2px 0;">⚠ 不同医院参考范围不同,异常与否按各自那次的范围判定;切到列表可看每次的具体范围。</div>`:''}
+    </div>`:`
+    <div class="card tlist">
+      <div class="tlhead"><span class="c1">日期</span><span class="c2">结果</span><span class="c3">参考(当次)</span><span class="c4">医院</span></div>
+      ${pts.slice().reverse().map(p=>{
+        const out = p.value < latest.low || p.value > latest.high;
+        const arrow = p.value > latest.high ? '↑' : (p.value < latest.low ? '↓' : '');
+        return `<div class="tlrow ${out?'ab':''}">
+          <span class="c1">${p.date}</span><span class="c2">${p.value}${arrow?` <span style="font-size:12px;">${arrow}</span>`:''}</span><span class="c3">${p.ref}</span>
+          <span class="c4"><span class="hosp-dot" style="background:${hospColor(p.hospital)}"></span>${p.hospital}</span></div>`;
+      }).join('')}
+    </div>`;
+  return `
+    <div class="seg"><div class="opt ${trendMode==='chart'?'on':''}" onclick="setMode('chart')">📈 图表</div><div class="opt ${trendMode==='list'?'on':''}" onclick="setMode('list')">📋 列表</div></div>
+    <div class="toolbar"><div class="picker2" onclick="openMetricPicker()"><span>${isW?'★ ':''}${cur.name} (${cur.count})</span><span style="color:#999">▾</span></div></div>
+    <div class="toolbar" style="margin-top:-4px;">
+      <div class="switch" onclick="toggleWatch('${trendKey}')" style="cursor:pointer;"><span class="${isW?'orange':''}">${isW?'★ 已关注此指标':'☆ 关注此指标'}</span></div>
+    </div>
+    ${body}
+  `;
+};
+
+/* ============ 交互 ============ */
+function toggleFav(key){ const i=favorites.indexOf(key); if(i>=0)favorites.splice(i,1); else favorites.unshift(key); render(); }
+function enterFeature(key){ if(key==='medical'){ stack=['home','medical']; render(); } }
+function switchSubject(id){ currentSubject=id; trendKey=null; histFilter={time:'all',type:'all',hosp:'all',from:'',to:''}; render(); }
+
+function addImg(){ uploadImgs.push(uploadImgs.length+1); render(); }
+function delImg(i){ uploadImgs.splice(i,1); render(); }
+function pickHosp(h){ uploadHospital=h; const el=document.getElementById('hospInput'); if(el)el.value=h; }
+
+function setMode(m){ trendMode=m; render(); }
+function toggleWatch(key){ const arr=watched[currentSubject]=watched[currentSubject]||[]; const i=arr.indexOf(key); if(i>=0)arr.splice(i,1); else arr.push(key); render(); }
+
+/* ===== 底部弹出选择器 ===== */
+function openSheet(html){ document.getElementById('sheet').innerHTML=html; document.getElementById('sheetMask').classList.add('show'); }
+function closeSheet(e){ document.getElementById('sheetMask').classList.remove('show'); }
+let metricFilter='';
+function openMetricPicker(){ metricFilter=''; renderMetricSheet(); document.getElementById('sheetMask').classList.add('show'); }
+function renderMetricSheet(){
+  const w=watched[currentSubject]||[];
+  let cat=sortedCatalog();
+  const kw=metricFilter.trim().toLowerCase();
+  if(kw) cat=cat.filter(c=>(c.name+(c.code||'')).toLowerCase().includes(kw));
+  const rows = cat.length ? cat.map(c=>{const k=c.code||c.name; const fav=w.includes(k);
+      return `<div class="opt-row ${k===trendKey?'on':''}" onclick="chooseMetric('${k}')"><span>${fav?'★ ':''}${c.name}${c.code?' · '+c.code:''}</span><span class="cnt">${c.count} 次</span></div>`;}).join('')
+    : `<div class="empty" style="padding:30px 0;">没有匹配的指标</div>`;
+  document.getElementById('sheet').innerHTML=`
+    <div class="sh-hd"><span class="cancel" onclick="closeSheet()">取消</span><span>选择指标</span><span style="width:28px"></span></div>
+    <div style="padding:10px 16px; position:sticky; top:48px; background:#fff;">
+      <input id="metricSearch" placeholder="🔍 搜索指标名 / 缩写" value="${metricFilter}"
+        oninput="onMetricSearch(this.value)" autofocus
+        style="width:100%; border:none; background:#f2f3f5; border-radius:8px; padding:10px 12px; font-size:14px;"/>
+    </div>
+    ${rows}
+  `;
+  const inp=document.getElementById('metricSearch'); if(inp){ inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); }
+}
+function onMetricSearch(v){ metricFilter=v; renderMetricSheet(); }
+function chooseMetric(k){ trendKey=k; closeSheet(); render(); }
+
+const REPORT_TYPES=['血常规','尿常规','肝功能','肾功能','血脂','血糖','甲状腺功能','心电图','影像检查','其他'];
+function openTypePicker(){
+  openSheet(`
+    <div class="sh-hd"><span class="cancel" onclick="closeSheet()">取消</span><span>报告类型</span><span style="width:28px"></span></div>
+    ${REPORT_TYPES.map(t=>`<div class="opt-row ${t===editType?'on':''}" onclick="chooseType('${t}')"><span>${t}</span>${t===editType?'<span>✓</span>':''}</div>`).join('')}
+  `);
+}
+function chooseType(t){ editType=t; closeSheet(); render(); }
+
+function openFilter(kind){
+  if(kind==='time'){
+    const opts=[['all','全部时间'],['3m','近3月'],['6m','近半年'],['12m','近1年']];
+    openSheet(`
+      <div class="sh-hd"><span class="cancel" onclick="closeSheet()">取消</span><span>按时间筛选</span><span style="width:28px"></span></div>
+      ${opts.map(o=>`<div class="opt-row ${o[0]===histFilter.time?'on':''}" onclick="chooseTime('${o[0]}')"><span>${o[1]}</span>${o[0]===histFilter.time?'<span>✓</span>':''}</div>`).join('')}
+      <div style="padding:14px 18px; border-top:6px solid #f5f5f5;">
+        <div style="font-size:13px; color:#666; margin-bottom:10px;">自定义范围(年-月)</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <input id="cfFrom" type="month" value="${histFilter.from}" style="flex:1; border:none; background:#f7f8fa; border-radius:8px; padding:10px; font-size:14px;"/>
+          <span style="color:#999;">至</span>
+          <input id="cfTo" type="month" value="${histFilter.to}" style="flex:1; border:none; background:#f7f8fa; border-radius:8px; padding:10px; font-size:14px;"/>
+        </div>
+        <button class="btn primary" style="margin-top:14px;" onclick="applyCustomTime()">应用自定义范围</button>
+      </div>
+    `);
+    return;
+  }
+  let opts, cur, setter;
+  if(kind==='type'){ opts=[['all','全部类型'],...[...new Set(allReports().map(r=>r.type))].map(t=>[t,t])]; cur=histFilter.type; setter=v=>histFilter.type=v; }
+  else { opts=[['all','全部医院'],...[...new Set(allReports().map(r=>r.hospital))].map(h=>[h,h])]; cur=histFilter.hosp; setter=v=>histFilter.hosp=v; }
+  window._filterSetter=setter;
+  openSheet(`
+    <div class="sh-hd"><span class="cancel" onclick="closeSheet()">取消</span><span>${kind==='type'?'按类型':'按医院'}筛选</span><span style="width:28px"></span></div>
+    ${opts.map(o=>`<div class="opt-row ${o[0]===cur?'on':''}" onclick="chooseFilter('${o[0]}')">
+      <span>${o[1]}</span>${o[0]===cur?'<span>✓</span>':''}</div>`).join('')}
+  `);
+}
+function chooseTime(v){ histFilter.time=v; histFilter.from=''; histFilter.to=''; closeSheet(); render(); }
+function applyCustomTime(){
+  const f=document.getElementById('cfFrom').value, t=document.getElementById('cfTo').value;
+  if(!f && !t){ alert('请至少选择一个时间'); return; }
+  histFilter.time='custom'; histFilter.from=f; histFilter.to=t; closeSheet(); render();
+}
+function chooseFilter(v){ window._filterSetter(v); closeSheet(); render(); }
+function resetFilter(){ histFilter={time:'all',type:'all',hosp:'all',from:'',to:''}; render(); }
+
+/* ============ 趋势绘图 ============ */
+function drawTrend(){
+  const cv=document.getElementById('tc'); if(!cv)return;
+  const ctx=cv.getContext('2d'); const W=cv.width,H=cv.height; ctx.clearRect(0,0,W,H);
+  const pts=trendPoints(trendKey); const cur=catalog().find(c=>(c.code||c.name)===trendKey);
+  if(!pts.length||!cur)return;
+  const latest=pts[pts.length-1]; const refLow=latest.low, refHigh=latest.high; // 参考带按最近一次
+  const pad={l:70,r:30,t:30,b:50}; const pw=W-pad.l-pad.r,ph=H-pad.t-pad.b;
+  const vals=pts.map(p=>p.value);
+  let vmin=Math.min(...vals,refLow),vmax=Math.max(...vals,refHigh);
+  const span=(vmax-vmin)||1; vmin-=span*0.15; vmax+=span*0.15;
+  const xAt=i=>pad.l+(pts.length===1?pw/2:pw*i/(pts.length-1));
+  const yAt=v=>pad.t+ph-ph*(v-vmin)/(vmax-vmin);
+  ctx.fillStyle='rgba(7,193,96,.15)'; const yH=yAt(refHigh),yL=yAt(refLow); ctx.fillRect(pad.l,yH,pw,yL-yH);
+  ctx.strokeStyle='rgba(7,193,96,.4)'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
+  [refHigh,refLow].forEach(v=>{ctx.beginPath();ctx.moveTo(pad.l,yAt(v));ctx.lineTo(pad.l+pw,yAt(v));ctx.stroke();});
+  ctx.setLineDash([]);
+  ctx.strokeStyle='#e0e0e0'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,pad.t+ph); ctx.lineTo(pad.l+pw,pad.t+ph); ctx.stroke();
+  ctx.fillStyle='#999'; ctx.font='22px sans-serif'; ctx.textAlign='right';
+  ctx.fillText(vmax.toFixed(0),pad.l-10,pad.t+18); ctx.fillText(vmin.toFixed(0),pad.l-10,pad.t+ph);
+  ctx.fillText(refHigh,pad.l-10,yH+8); ctx.fillText(refLow,pad.l-10,yL+8);
+  ctx.strokeStyle='#c8c8c8'; ctx.lineWidth=2; ctx.beginPath();
+  pts.forEach((p,i)=>{const x=xAt(i),y=yAt(p.value); i?ctx.lineTo(x,y):ctx.moveTo(x,y);}); ctx.stroke();
+  ctx.fillStyle='#aaa'; ctx.font='18px sans-serif'; ctx.textAlign='center';
+  pts.forEach((p,i)=>ctx.fillText(p.date.slice(5),xAt(i),pad.t+ph+28));
+  pts.forEach((p,i)=>{const x=xAt(i),y=yAt(p.value);
+    const out = p.value < refLow || p.value > refHigh;
+    ctx.fillStyle=hospColor(p.hospital);ctx.beginPath();ctx.arc(x,y,6,0,7);ctx.fill();
+    ctx.fillStyle=out?'#e64340':'#333';ctx.font='bold 20px sans-serif';ctx.textAlign='center';ctx.fillText(p.value,x,y-16);});
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -15,7 +15,9 @@ class MedicalReport(Base):
     report_type: Mapped[str] = mapped_column(String, default="unknown", index=True)
     report_type_label: Mapped[str | None] = mapped_column(String, nullable=True)
     report_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    hospital: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     image_path: Mapped[str] = mapped_column(String, nullable=False)
+    image_paths: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String, default="parsed")  # uploaded/parsing/parsed/failed
     raw_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

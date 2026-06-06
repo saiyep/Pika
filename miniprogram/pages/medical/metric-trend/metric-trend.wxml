@@ -13,7 +13,12 @@
     <canvas type="2d" id="trendCanvas" class="chart"></canvas>
     <view class="legend">
       <text class="legend-band">浅绿区间 = 参考范围</text>
-      <text class="legend-dot">红点 = 异常</text>
+      <text class="legend-dot">点颜色 = 医院来源（见下方列表）</text>
+    </view>
+    <view wx:if="{{trend.points && trend.points.length}}" class="legend-list">
+      <view wx:for="{{trend.points}}" wx:key="report_id" class="legend-row">
+        <text>{{item.report_date || '日期未知'}}：{{item.hospital || '医院未知'}}</text>
+      </view>
     </view>
   </view>
 

@@ -43,6 +43,7 @@ class ReportOut(BaseModel):
     report_type: str
     report_type_label: str | None = None
     report_date: date | None = None
+    hospital: str | None = None
     status: str
     created_at: datetime
 
@@ -57,6 +58,7 @@ class ReportListItem(BaseModel):
     report_type: str
     report_type_label: str | None = None
     report_date: date | None = None
+    hospital: str | None = None
     uploader_nickname: str | None = None
     abnormal_count: int = 0
     status: str
@@ -73,6 +75,7 @@ class TrendPoint(BaseModel):
     value_num: float | None = None
     abnormal_flag: str | None = None
     report_id: int
+    hospital: str | None = None
 
 
 class TrendOut(BaseModel):
@@ -92,3 +95,33 @@ class CatalogItem(BaseModel):
 
 class CatalogOut(BaseModel):
     items: list[CatalogItem]
+
+
+class DraftMetric(BaseModel):
+    item_name: str
+    item_code: str | None = None
+    value_text: str | None = None
+    value_num: float | None = None
+    unit: str | None = None
+    ref_range: str | None = None
+    ref_low: float | None = None
+    ref_high: float | None = None
+    abnormal_flag: str | None = None
+    seq: int = 0
+
+
+class DraftOut(BaseModel):
+    draft_id: str
+    report_type: str
+    report_type_label: str | None = None
+    report_date: date | None = None
+    hospital: str | None = None
+    metrics: list[DraftMetric]
+
+
+class DraftCommitIn(BaseModel):
+    report_type: str = "unknown"
+    report_type_label: str | None = None
+    report_date: date | None = None
+    hospital: str | None = None
+    metrics: list[DraftMetric]

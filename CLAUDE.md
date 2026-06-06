@@ -2,86 +2,102 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Continuing context
+## Read first
 
-For project status, history, decisions, and the to-do list, read **`docs/PROJECT_STATUS.md`** first. The full design plan is in `docs/IMPLEMENTATION_PLAN.md`.
+Before coding, read:
+- `docs/PROJECT_STATUS.md` (current truth, progress, blockers, next steps)
+- `docs/IMPLEMENTATION_PLAN.md` (current implementation scope and execution order)
 
-## Project Overview
+## Project scope (current)
 
-**Pika** is a self-hosted **family service platform** running on a home NAS (UGREEN DH4300plus, Docker). It is designed to grow module by module; the first module is a **medical visit assistant** for tracking a family member's medical check-up records.
+Pika is a self-hosted family service platform running on a home NAS. The current active module is **就医服务** (medical check-up tracking).
 
-Core flow of the medical module: a family member uploads a photo of a medical report (e.g. blood routine) via a WeChat Mini Program → the FastAPI backend stores the raw image on the NAS and calls Azure GPT-4.5-mini (vision) to extract structured data → results are stored in SQLite → the Mini Program shows a dashboard with history and per-metric trends.
+POC v0.1 scope (current and authoritative):
+1. `hospital` is required and must be persisted/displayed end-to-end.
+2. One report can contain **multiple images**.
+3. Upload flow is **two-stage**: draft parse first, user edits, then commit.
 
-## Architecture
+Not in current scope:
+- family member management UI/permission model
+- complex subscription system
+- public HTTPS production rollout
 
-```
-miniprogram/  (WeChat Mini Program, native)
-      |  HTTP (LAN POC: http://<nas-ip>:8000)
-      v
-backend/app/
-├── core/          # platform-wide capabilities, shared across modules
-│   ├── db.py            # SQLAlchemy engine / SessionLocal / Base / get_db
-│   ├── models_base.py   # User table (WeChat openid) + TimestampMixin
-│   ├── deps.py          # current-user resolution (X-Pika-Token header)
-│   ├── wechat.py        # wx.login code -> openid (jscode2session)
-│   ├── storage.py       # raw image persistence (path/naming/save/read)
-│   ├── schemas_base.py  # unified ApiResponse wrapper
-│   └── exceptions.py
-└── modules/
-    └── medical/   # medical module (may depend on core)
-        ├── router.py     # /api/medical/* endpoints
-        ├── models.py     # MedicalReport / MedicalReportMetric
-        ├── schemas.py
-        ├── service.py    # orchestration: store image -> vision -> persist
-        ├── vision.py     # Azure GPT-4.5-mini vision call + JSON fallback
-        └── prompts.py
-```
+## Architecture (authoritative)
 
-**Layering rule**: `core/` must NOT depend on `modules/`. New modules go under `modules/<name>/` and are mounted in `app/main.py`; do not modify existing modules to add a new one.
+Mini Program (native WeChat) -> FastAPI backend -> SQLite + NAS file storage -> Azure GPT-4.5-mini (vision)
 
-## Conventions
+Backend layering:
+- `backend/app/core/`: platform-level shared capabilities (db/session, user resolution, storage, base schemas/exceptions)
+- `backend/app/modules/medical/`: medical module only (models/schemas/service/router/vision)
 
-- **DB table naming**: platform-level tables (e.g. `users`) live in core with generic names. **Module business tables MUST be prefixed with the module name** (medical → `medical_reports`, `medical_report_metrics`). Future modules follow `<module>_` prefixing to avoid collisions.
-- **API paths**: module-prefixed, e.g. `/api/medical/...`.
-- **Unified response**: `{"code": 0, "msg": "ok", "data": {...}}`; `code != 0` means business error.
-- **Auth (POC)**: WeChat `wx.login` code → backend swaps for `openid` via `jscode2session`. Token (POC: token == openid) passed in `X-Pika-Token` header. No permissions — the whole family shares read/write; the user table is only for identifying & displaying who uploaded/whose report.
-- **Secrets**: never commit. Azure keys / WeChat AppSecret are injected via the UGREEN Docker compose `environment` UI; `settings.py` reads them from env vars. Repo only ships `.env.example` with placeholders.
+Rule: `core/` must not depend on `modules/`.
 
-## Persistent data (mounted to NAS)
+## Data and API conventions
 
-The container is disposable; anything that must survive a rebuild is mounted to the NAS:
+- Unified response wrapper: `{"code": 0, "msg": "ok", "data": ...}`
+- Auth (POC): `X-Pika-Token` header, token == openid
+- Table naming: module business tables must use `medical_` prefix
 
-| Data | Container path | NAS path |
-|------|----------------|----------|
-| Raw images | `/app/data/uploads/medical` | `/volume1/Projects/Pika/data/uploads/medical` |
-| SQLite DB | `/app/data/db` | `/volume1/Projects/Pika/data/db` |
+Current key medical APIs:
+- `POST /api/medical/report-drafts`
+- `POST /api/medical/report-drafts/{draft_id}/commit`
+- `POST /api/medical/reports` (compat path)
+- `GET /api/medical/reports`
+- `GET /api/medical/reports/{id}`
+- `GET /api/medical/reports/{id}/image`
+- `GET /api/medical/metrics/catalog`
+- `GET /api/medical/metrics/trend`
 
-Images are stored under `uploads/medical/{YYYY}/{MM}/` and named `{YYYYMMDD_HHMMSS}_{uuid4[:8]}.{ext}`. The DB stores **relative** image paths; absolute paths are joined with `settings.UPLOAD_DIR` at read time.
+## Storage and deployment constraints
 
-## Development
+Persistent mounts (required):
+- Raw images: `/volume1/Projects/Pika/data/uploads/medical` -> `/app/data/uploads/medical`
+- SQLite DB: `/volume1/Projects/Pika/data/db` -> `/app/data/db`
+
+Important UGREEN Docker UI constraint:
+- `docker-compose.yml` must keep `build.context: .`
+- Project files must be placed inside the NAS shared directory used by UGREEN Docker UI
+
+## Secrets policy (current)
+
+Do not store real secrets in repo files.
+Inject runtime env vars in NAS compose environment:
+- `AZURE_OPENAI_ENDPOINT`
+- `AZURE_OPENAI_API_KEY`
+- `AZURE_OPENAI_API_VERSION`
+- `AZURE_OPENAI_DEPLOYMENT`
+- `WX_APPID`
+- `WX_SECRET`
+
+## Local development commands
 
 ```bash
-# Backend (local)
 cd backend
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python -m venv .venv
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+# cmd: .venv\Scripts\activate.bat
+# bash/zsh: source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload                        # http://localhost:8000
 
-# Test upload + parse end-to-end
-curl -F file=@blood_routine.jpg http://localhost:8000/api/medical/reports
+DATA_DIR=./data UPLOAD_DIR=./data/uploads/medical DB_PATH=./data/db/pika.db uvicorn app.main:app --reload
 ```
 
-### Environment variables (see `.env.example`)
+Health check:
+```bash
+curl http://127.0.0.1:8000/health
+```
 
-- `WX_APPID`, `WX_SECRET` — WeChat Mini Program credentials
-- `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_API_VERSION`, `AZURE_OPENAI_DEPLOYMENT` — Azure GPT-4.5-mini (vision)
-- `DATA_DIR`, `UPLOAD_DIR`, `DB_PATH` — runtime paths (defaults wired for the container)
+Docker local:
+```bash
+docker compose up --build
+```
 
-### NAS deployment (UGREEN Docker)
+## DB migration note for this POC
 
-Deploy via the UGREEN Docker compose UI. Key gotcha: compose `build.context` must be `.` and all files must sit inside the shared directory the UGREEN UI creates. Inject secrets through the compose `environment` fields.
+Current backend uses `create_all`. It does not alter existing tables to add new columns.
+For schema changes in this POC stage, rebuild local DB file (`pika.db`) before rerun.
 
-## Scope notes
+## Mini Program runtime note
 
-- **Current scope = LAN POC**: WeChat dev-tool / developer's own phone preview connecting to the NAS LAN IP. Dev versions can hit `http://<lan-ip>:8000` by ticking "do not verify legal domain" in WeChat DevTools.
-- **Public HTTPS domain** (for family to use anywhere via experience/production version) is a **later phase**, not implemented yet.
+- DevTools must enable “不校验合法域名” for LAN HTTP POC.
+- `miniprogram/project.config.json` still requires a real AppID before full device flow.

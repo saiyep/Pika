@@ -1,19 +1,37 @@
 <view class="page">
-  <view wx:if="{{previewPath}}" class="preview">
-    <image src="{{previewPath}}" mode="widthFix" />
+  <view class="section">
+    <text class="section-title">医院</text>
+    <input class="input" placeholder="请输入医院名称" value="{{hospital}}" bindinput="onHospitalInput" />
   </view>
 
-  <button class="btn" bindtap="chooseImage">{{previewPath ? '重新选择' : '拍照 / 选择检查单'}}</button>
-  <button wx:if="{{previewPath}}" class="btn primary" bindtap="upload" loading="{{uploading}}" disabled="{{uploading}}">
-    {{uploading ? '识别中…' : '上传并识别'}}
-  </button>
-
-  <view wx:if="{{result}}" class="result">
-    <text class="result-title">{{result.report.report_type_label || '检查单'}}（{{result.report.status === 'parsed' ? '识别成功' : '识别失败'}}）</text>
-    <view wx:for="{{result.metrics}}" wx:key="seq" class="metric {{item.abnormal_flag === 'high' || item.abnormal_flag === 'low' ? 'abnormal' : ''}}">
-      <text class="m-name">{{item.item_name}}</text>
-      <text class="m-value">{{item.value_text}} {{item.unit || ''}}</text>
-      <text class="m-ref">{{item.ref_range || ''}}</text>
+  <view wx:if="{{step === 'pick'}}">
+    <view class="preview-list" wx:if="{{files.length}}">
+      <view class="preview-item" wx:for="{{files}}" wx:key="id">
+        <image src="{{item.path}}" mode="aspectFill" />
+        <text class="remove" data-id="{{item.id}}" bindtap="removeImage">✕</text>
+      </view>
     </view>
+
+    <button class="btn" bindtap="chooseImage">{{files.length ? '重新选择（可多张）' : '拍照 / 选择检查单（可多张）'}}</button>
+    <button wx:if="{{files.length}}" class="btn primary" bindtap="createDraft" loading="{{uploading}}" disabled="{{uploading}}">
+      {{uploading ? '识别中…' : '开始识别并编辑'}}
+    </button>
+  </view>
+
+  <view wx:if="{{step === 'edit'}}" class="result">
+    <text class="result-title">识别结果（可手动修正后提交）</text>
+    <view class="section mini">
+      <text class="section-title">报告类型标签</text>
+      <input class="input" placeholder="如：血常规" value="{{reportTypeLabel}}" bindinput="onReportTypeInput" />
+    </view>
+
+    <view wx:for="{{metrics}}" wx:key="seq" class="metric">
+      <input class="m-name" data-idx="{{index}}" data-field="item_name" value="{{item.item_name}}" bindinput="onMetricFieldInput" />
+      <input class="m-value" data-idx="{{index}}" data-field="value_text" value="{{item.value_text}}" bindinput="onMetricFieldInput" />
+      <input class="m-unit" data-idx="{{index}}" data-field="unit" value="{{item.unit}}" bindinput="onMetricFieldInput" />
+      <input class="m-ref" data-idx="{{index}}" data-field="ref_range" value="{{item.ref_range}}" bindinput="onMetricFieldInput" />
+    </view>
+
+    <button class="btn primary" bindtap="submitDraft">确认无误并提交</button>
   </view>
 </view>

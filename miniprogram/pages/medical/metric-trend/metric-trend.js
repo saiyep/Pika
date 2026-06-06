@@ -118,12 +118,20 @@ Page({
         });
         ctx.stroke();
 
-        // points
+        // points (color by hospital)
+        const colorByHospital = {};
+        const palette = ['#07c160', '#4b8bf4', '#fa8c16', '#a64dff', '#13c2c2'];
+        let colorIdx = 0;
+
         points.forEach((p, i) => {
           const x = xAt(i);
           const y = yAt(p.value_num);
-          const abnormal = p.abnormal_flag === 'high' || p.abnormal_flag === 'low';
-          ctx.fillStyle = abnormal ? '#e64340' : '#07c160';
+          const key = p.hospital || 'unknown';
+          if (!colorByHospital[key]) {
+            colorByHospital[key] = palette[colorIdx % palette.length];
+            colorIdx += 1;
+          }
+          ctx.fillStyle = colorByHospital[key];
           ctx.beginPath();
           ctx.arc(x, y, 4, 0, Math.PI * 2);
           ctx.fill();

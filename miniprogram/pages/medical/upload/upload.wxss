@@ -1,12 +1,27 @@
-.page { padding: 32rpx; }
-.preview { margin-bottom: 24rpx; border-radius: 12rpx; overflow: hidden; }
-.preview image { width: 100%; }
+.page { padding: 24rpx; }
+.section { margin-bottom: 20rpx; }
+.section.mini { margin: 16rpx 0; }
+.section-title { display: block; font-size: 24rpx; color: #666; margin-bottom: 8rpx; }
+.input { background: #fff; border-radius: 12rpx; padding: 18rpx; font-size: 26rpx; }
+.preview-list { display: flex; flex-wrap: wrap; gap: 12rpx; margin-bottom: 20rpx; }
+.preview-item { width: 200rpx; height: 200rpx; border-radius: 12rpx; overflow: hidden; position: relative; }
+.preview-item image { width: 100%; height: 100%; }
+.remove {
+  position: absolute;
+  right: 8rpx;
+  top: 8rpx;
+  width: 36rpx;
+  height: 36rpx;
+  line-height: 36rpx;
+  text-align: center;
+  border-radius: 18rpx;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 22rpx;
+}
 .btn { margin-bottom: 20rpx; background: #fff; color: #333; }
 .btn.primary { background: #07c160; color: #fff; }
-.result { margin-top: 32rpx; background: #fff; border-radius: 12rpx; padding: 24rpx; }
-.result-title { display: block; font-size: 32rpx; font-weight: 600; margin-bottom: 16rpx; }
-.metric { display: flex; justify-content: space-between; padding: 16rpx 0; border-bottom: 1rpx solid #f0f0f0; font-size: 26rpx; }
-.metric.abnormal .m-value { color: #e64340; font-weight: 600; }
-.m-name { flex: 2; color: #333; }
-.m-value { flex: 1; text-align: right; color: #333; }
-.m-ref { flex: 1.5; text-align: right; color: #999; }
+.result { margin-top: 24rpx; background: #fff; border-radius: 12rpx; padding: 24rpx; }
+.result-title { display: block; font-size: 30rpx; font-weight: 600; margin-bottom: 14rpx; }
+.metric { display: grid; grid-template-columns: 2fr 1.2fr 1fr 1.5fr; gap: 8rpx; padding: 10rpx 0; border-bottom: 1rpx solid #f0f0f0; }
+.metric input { background: #f7f7f7; border-radius: 8rpx; padding: 10rpx; font-size: 22rpx; }

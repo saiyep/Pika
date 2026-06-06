@@ -16,6 +16,9 @@ from app.modules.medical.models import MedicalReport, MedicalReportMetric
 from app.modules.medical.schemas import (
     CatalogItem,
     CatalogOut,
+    DraftCommitIn,
+    DraftMetric,
+    DraftOut,
     MetricOut,
     ReportDetailOut,
     ReportListItem,
@@ -33,6 +36,7 @@ async def upload_report(
     file: UploadFile = File(...),
     report_date: str | None = Form(default=None),
     subject_id: int | None = Form(default=None),
+    hospital: str | None = Form(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -45,7 +49,67 @@ async def upload_report(
         filename=file.filename,
         content_type=file.content_type,
         report_date_override=report_date,
+        hospital_override=hospital,
     )
+    return ApiResponse.ok(
+        ReportDetailOut(
+            report=ReportOut.model_validate(report),
+            metrics=[MetricOut.model_validate(m) for m in report.metrics],
+        )
+    )
+
+
+@router.post("/report-drafts", response_model=ApiResponse[DraftOut])
+async def create_report_draft(
+    files: list[UploadFile] = File(...),
+    report_date: str | None = Form(default=None),
+    subject_id: int | None = Form(default=None),
+    hospital: str | None = Form(default=None),
+    user: User = Depends(get_current_user),
+):
+    payload = []
+    for f in files:
+        payload.append((await f.read(), f.filename, f.content_type))
+
+    draft = service.create_draft_from_images(
+        uploader_id=user.id,
+        subject_id=subject_id,
+        files=payload,
+        report_date_override=report_date,
+        hospital_override=hospital,
+    )
+    return ApiResponse.ok(
+        DraftOut(
+            draft_id=draft["draft_id"],
+            report_type=draft["report_type"],
+            report_type_label=draft["report_type_label"],
+            report_date=draft["report_date"],
+            hospital=draft["hospital"],
+            metrics=[DraftMetric(**m) for m in draft["metrics"]],
+        )
+    )
+
+
+@router.post("/report-drafts/{draft_id}/commit", response_model=ApiResponse[ReportDetailOut])
+def commit_report_draft(
+    draft_id: str,
+    body: DraftCommitIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        report = service.commit_draft(
+            db,
+            draft_id=draft_id,
+            report_type=body.report_type,
+            report_type_label=body.report_type_label,
+            report_date=body.report_date,
+            hospital=body.hospital,
+            metrics=[m.model_dump() for m in body.metrics],
+        )
+    except ValueError as e:
+        raise NotFoundError(str(e))
+
     return ApiResponse.ok(
         ReportDetailOut(
             report=ReportOut.model_validate(report),
@@ -89,6 +153,7 @@ def list_reports(
                 report_type=r.report_type,
                 report_type_label=r.report_type_label,
                 report_date=r.report_date,
+                hospital=r.hospital,
                 uploader_nickname=nickname_by_id.get(r.uploader_id),
                 abnormal_count=abnormal,
                 status=r.status,
@@ -153,6 +218,7 @@ def metric_trend(
             value_num=metric.value_num,
             abnormal_flag=metric.abnormal_flag,
             report_id=rep.id,
+            hospital=rep.hospital,
         )
         for metric, rep in rows
     ]
