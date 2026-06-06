@@ -10,7 +10,7 @@
   },
   "compileType": "miniprogram",
   "libVersion": "latest",
-  "appid": "REPLACE_WITH_YOUR_APPID",
+  "appid": "wx66fb1c078102491d",
   "projectname": "pika-miniprogram",
   "miniprogramRoot": "./"
 }

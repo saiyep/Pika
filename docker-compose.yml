@@ -9,8 +9,8 @@ services:
     volumes:
       - /volume1/Projects/Pika/data/uploads/medical:/app/data/uploads/medical  # 原图，单独挂载
       - /volume1/Projects/Pika/data/db:/app/data/db                            # SQLite，单独挂载
-    environment:                              # 凭据由绿联界面 environment 注入，不入 git
-      - TZ=Asia/Shanghai
+    environment:                              # 凭据由 .env 注入（NAS 本地，不入 git）
+      - TZ=${TZ}
       - DATA_DIR=/app/data
       - UPLOAD_DIR=/app/data/uploads/medical
       - DB_PATH=/app/data/db/pika.db
@@ -20,4 +20,9 @@ services:
       - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
       - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
       - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT}
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
     restart: unless-stopped

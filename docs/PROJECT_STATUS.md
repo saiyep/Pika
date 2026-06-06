@@ -9,7 +9,7 @@
 - 支持一份报告多图上传（`image_paths`）
 - 上传改为两阶段（草稿预解析 -> 人工修正 -> 确认提交）
 
-本地接口链路已跑通；NAS 真机链路仍待完成。
+**后端已部署到绿联 NAS 并通过 `/health`；Azure `gpt-5.4-mini` 视觉解析已实测可用。** 当前进入小程序真机联调阶段。
 
 ## 当前有效需求（唯一口径）
 
@@ -39,34 +39,29 @@
 - 历史页、详情页展示 hospital。
 - 趋势页点位按 hospital 区分显示，并展示来源信息。
 
+### 部署与环境
+- 后端已用绿联 Docker「项目/Compose」部署到 NAS 目录 `\\DH4300PLUS-D2E0\docker\pika`。
+- 凭据走该目录 `.env`（不入 git），compose 用 `${...}` 占位注入。
+- 已加资源限制：`cpus "1.0"` / `memory 1024M`，端口 `8000:8000`。
+- `http://192.168.1.100:8000/health` 已正常返回。
+- Azure（endpoint `...cognitiveservices.azure.com`、部署名 `gpt-5.4-mini`、api_version `2025-04-01-preview`）已实测可做视觉解析，现有 vision 代码无需改动。
+- 小程序 `config.js` 指向 `http://192.168.1.100:8000`；`project.config.json` 填入真实 AppID。
+
 ## 当前待办（下一步按优先级）
 
-1. **NAS 部署恢复与挂载核验**
-   - 确认挂载生效：
-     - `/volume1/Projects/Pika/data/uploads/medical`
-     - `/volume1/Projects/Pika/data/db`
-2. **注入真实凭据**（NAS compose environment）
-   - `AZURE_OPENAI_ENDPOINT`
-   - `AZURE_OPENAI_API_KEY`
-   - `AZURE_OPENAI_API_VERSION`
-   - `AZURE_OPENAI_DEPLOYMENT`
-   - `WX_APPID`
-   - `WX_SECRET`
-3. **小程序配置与真机联调**
-   - 注册并填写真实 AppID（`miniprogram/project.config.json`）
-   - `miniprogram/config.js` 指向 NAS 局域网 IP
-   - DevTools 开启“不校验合法域名”
-4. **验收 POC 主链路**
-   - 多图上传 -> 预解析草稿 -> 人工修正 -> 提交
-   - 历史/详情/趋势可见 hospital
-5. **解析质量调优**
-   - 用真实检查单调 `prompts.py` 与后处理
+1. **小程序真机联调（当前焦点）**
+   - 微信开发者工具勾「不校验合法域名」连 `http://192.168.1.100:8000`
+   - 跑通：登录 -> 多图上传 -> 预解析草稿 -> 人工修正 -> 提交 -> 历史/详情/趋势可见 hospital
+2. **解析质量调优**
+   - 用真实检查单评估准确率，必要时调 `prompts.py` 与后处理
+3. **稳定性与回归**
+   - 连续多次上传验证；确认失败兜底（原图不丢、status=failed）
+4. （后续阶段）公网 HTTPS、成员管理、更多检查类型与模块
 
 ## 当前阻塞项
 
-- 未完成 NAS 真环境凭据注入
-- 小程序 AppID 仍为占位符
-- 未完成真机端到端回归
+- 暂无硬阻塞。后端已部署、Azure 已验证、配置已就位。
+- 待完成项主要是小程序真机联调与解析质量验证。
 
 ## 关键路径文件
 

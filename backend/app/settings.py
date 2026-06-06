@@ -10,11 +10,11 @@ class Settings(BaseSettings):
     wx_appid: str = ""
     wx_secret: str = ""
 
-    # Azure OpenAI (GPT-4.5-mini, vision)
+    # Azure OpenAI (gpt-5.4-mini, vision)
     azure_openai_endpoint: str = ""
     azure_openai_api_key: str = ""
     azure_openai_api_version: str = "2024-10-21"
-    azure_openai_deployment: str = "gpt-4.5-mini"
+    azure_openai_deployment: str = "gpt-5.4-mini"
 
     # Runtime paths
     data_dir: str = "./data"
