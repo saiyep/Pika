@@ -79,6 +79,7 @@ python -m venv .venv
 # bash/zsh: source .venv/bin/activate
 pip install -r requirements.txt
 
+DATA_DIR=./data UPLOAD_DIR=./data/uploads/medical DB_PATH=./data/db/pika.db alembic upgrade head
 DATA_DIR=./data UPLOAD_DIR=./data/uploads/medical DB_PATH=./data/db/pika.db uvicorn app.main:app --reload
 ```
 
@@ -87,15 +88,31 @@ Health check:
 curl http://127.0.0.1:8000/health
 ```
 
+Tests:
+```bash
+cd backend && pytest          # vision post-processing + draft/commit flow (Azure mocked)
+```
+
 Docker local:
 ```bash
 docker compose up --build
 ```
 
-## DB migration note for this POC
+## DB migration (Alembic)
 
-Current backend uses `create_all`. It does not alter existing tables to add new columns.
-For schema changes in this POC stage, rebuild local DB file (`pika.db`) before rerun.
+Schema is managed by Alembic (`backend/alembic/`). `create_all` is gone — the app no longer builds tables on startup. `alembic/env.py` reads the DB URL from `settings.db_path`, so local and NAS use the same wiring.
+
+Workflow (run inside `backend/`):
+```bash
+alembic upgrade head                          # apply migrations (run before first start / after pull)
+alembic revision --autogenerate -m "message"  # after editing models.py, generate a migration
+alembic downgrade -1                           # roll back one
+```
+
+NAS note: the existing `pika.db` predates Alembic. Stamp it once so Alembic treats it as current, then upgrade normally going forward:
+```bash
+alembic stamp head    # ONLY the first time, on the pre-existing NAS DB
+```
 
 ## Mini Program runtime note
 

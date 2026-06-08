@@ -1,11 +1,14 @@
+import hashlib
 import json
 import logging
+import os
 import uuid
 from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from app.core import storage
+from app.core.exceptions import DuplicateReportError
 from app.modules.medical import vision
 from app.modules.medical.models import MedicalReport, MedicalReportMetric
 
@@ -28,6 +31,13 @@ def _new_draft_id() -> str:
     return uuid.uuid4().hex
 
 
+def _content_hash(files: list[tuple[bytes, str | None, str | None]]) -> str:
+    """Order-independent hash of a report's images: sha256 of each image's
+    sha256, sorted then joined. Same images -> same hash regardless of order."""
+    per_image = sorted(hashlib.sha256(content).hexdigest() for content, _, _ in files)
+    return hashlib.sha256("".join(per_image).encode()).hexdigest()
+
+
 def _cleanup_expired_drafts() -> None:
     now = datetime.now()
     expired = [k for k, v in _DRAFTS.items() if v.get("expires_at") and v["expires_at"] < now]
@@ -48,6 +58,7 @@ def _persist_report(
     metrics: list[dict],
     raw_json: str | None,
     status: str,
+    content_hash: str | None = None,
 ) -> MedicalReport:
     report = MedicalReport(
         uploader_id=uploader_id,
@@ -58,6 +69,7 @@ def _persist_report(
         hospital=hospital,
         image_path=image_paths[0],
         image_paths=image_paths,
+        content_hash=content_hash,
         raw_json=raw_json,
         status=status,
     )
@@ -71,6 +83,7 @@ def _persist_report(
 
 
 def create_draft_from_images(
+    db: Session,
     *,
     uploader_id: int,
     subject_id: int | None,
@@ -78,8 +91,16 @@ def create_draft_from_images(
     report_date_override: str | None = None,
     hospital_override: str | None = None,
 ) -> dict:
-    """Save images + parse first image into an in-memory draft."""
+    """Save images + parse first image into an in-memory draft.
+
+    Rejects duplicates (same image set already committed) before saving or
+    parsing, to save disk and Azure tokens.
+    """
     _cleanup_expired_drafts()
+
+    content_hash = _content_hash(files)
+    if db.query(MedicalReport.id).filter_by(content_hash=content_hash).first():
+        raise DuplicateReportError("该检查单已存在，请勿重复上传")
 
     image_paths = [
         storage.save_image(content, filename, content_type)
@@ -111,6 +132,7 @@ def create_draft_from_images(
         "uploader_id": uploader_id,
         "subject_id": subject_id,
         "image_paths": image_paths,
+        "content_hash": content_hash,
         "report_type": report_type,
         "report_type_label": report_type_label,
         "report_date": report_date,
@@ -155,6 +177,7 @@ def commit_draft(
         metrics=metrics,
         raw_json=draft.get("raw_json"),
         status="parsed" if metrics else draft.get("status", "failed"),
+        content_hash=draft.get("content_hash"),
     )
 
     _DRAFTS.pop(draft_id, None)
@@ -174,6 +197,7 @@ def create_report(
 ) -> MedicalReport:
     """Backward-compatible single-step flow: upload -> parse -> persist."""
     draft = create_draft_from_images(
+        db,
         uploader_id=uploader_id,
         subject_id=subject_id,
         files=[(image_bytes, filename, content_type)],
@@ -189,3 +213,54 @@ def create_report(
         hospital=draft["hospital"],
         metrics=draft["metrics"],
     )
+
+
+def delete_report(db: Session, *, report_id: int) -> bool:
+    """Delete a report, its metrics (cascade), and its image files.
+
+    Returns False if the report does not exist.
+    """
+    report = db.get(MedicalReport, report_id)
+    if not report:
+        return False
+
+    paths = report.image_paths or ([report.image_path] if report.image_path else [])
+    for rel in paths:
+        abs_p = storage.abs_path(rel)
+        if os.path.exists(abs_p):
+            os.remove(abs_p)
+
+    db.delete(report)
+    db.commit()
+    return True
+
+
+def reparse_report(db: Session, *, report_id: int) -> MedicalReport | None:
+    """Re-run vision on a stored report's first image and refresh its
+    metrics/type/date/status. Returns None if the report does not exist.
+    Used to recover from transient parse failures without re-uploading.
+    """
+    report = db.get(MedicalReport, report_id)
+    if not report:
+        return None
+
+    abs_p = storage.abs_path(report.image_path)
+    with open(abs_p, "rb") as f:
+        image_bytes = f.read()
+
+    parsed, raw_text = vision.parse_report_image(image_bytes)
+
+    report.metrics.clear()
+    for m in parsed["metrics"]:
+        report.metrics.append(MedicalReportMetric(**m))
+    report.report_type = parsed["report_type"] or "unknown"
+    report.report_type_label = parsed["report_type_label"]
+    parsed_date = _parse_date(parsed["report_date"])
+    if parsed_date:
+        report.report_date = parsed_date
+    report.raw_json = raw_text
+    report.status = "parsed" if parsed["metrics"] else "failed"
+
+    db.commit()
+    db.refresh(report)
+    return report

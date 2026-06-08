@@ -25,3 +25,8 @@ class WeChatError(PikaException):
 class VisionParseError(PikaException):
     code = 5001
     msg = "vision parse failed"
+
+
+class DuplicateReportError(PikaException):
+    code = 4090
+    msg = "report already exists"

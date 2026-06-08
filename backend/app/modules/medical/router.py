@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core import storage
 from app.core.db import get_db
 from app.core.deps import get_current_user
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import NotFoundError, VisionParseError
 from app.core.models_base import User
 from app.core.schemas_base import ApiResponse
 from app.modules.medical import service
@@ -65,6 +65,7 @@ async def create_report_draft(
     report_date: str | None = Form(default=None),
     subject_id: int | None = Form(default=None),
     hospital: str | None = Form(default=None),
+    db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     payload = []
@@ -72,6 +73,7 @@ async def create_report_draft(
         payload.append((await f.read(), f.filename, f.content_type))
 
     draft = service.create_draft_from_images(
+        db,
         uploader_id=user.id,
         subject_id=subject_id,
         files=payload,
@@ -171,6 +173,38 @@ def get_report(
 ):
     report = db.get(MedicalReport, report_id)
     if not report:
+        raise NotFoundError("report not found")
+    return ApiResponse.ok(
+        ReportDetailOut(
+            report=ReportOut.model_validate(report),
+            metrics=[MetricOut.model_validate(m) for m in report.metrics],
+        )
+    )
+
+
+@router.delete("/reports/{report_id}", response_model=ApiResponse[None])
+def delete_report(
+    report_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    ok = service.delete_report(db, report_id=report_id)
+    if not ok:
+        raise NotFoundError("report not found")
+    return ApiResponse.ok(None)
+
+
+@router.post("/reports/{report_id}/reparse", response_model=ApiResponse[ReportDetailOut])
+def reparse_report(
+    report_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        report = service.reparse_report(db, report_id=report_id)
+    except Exception:
+        raise VisionParseError("重新解析失败，请稍后再试")
+    if report is None:
         raise NotFoundError("report not found")
     return ApiResponse.ok(
         ReportDetailOut(

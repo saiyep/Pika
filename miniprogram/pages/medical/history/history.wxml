@@ -11,5 +11,6 @@
       <text wx:elif="{{item.status === 'failed'}}" class="failed">识别失败</text>
       <text wx:else class="normal">正常</text>
     </view>
+    <view class="del" catchtap="onDelete" data-id="{{item.id}}">删除</view>
   </view>
 </view>

@@ -1,9 +1,13 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
+alembic
 pydantic
 pydantic-settings
 openai
 httpx
 python-multipart
 pillow
+
+# dev / test
+pytest

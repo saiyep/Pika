@@ -8,7 +8,10 @@
     <text class="date">{{report.report_date || '日期未知'}} · {{report.hospital || '医院未知'}}</text>
   </view>
 
-  <view wx:if="{{report.status === 'failed'}}" class="failed-tip">识别失败，原图已保存，可重新上传</view>
+  <view wx:if="{{report.status === 'failed'}}" class="failed-tip">
+    识别失败，原图已保存
+    <button class="reparse-btn" size="mini" loading="{{reparsing}}" bindtap="onReparse">重新解析</button>
+  </view>
 
   <view class="metrics">
     <view class="m-head">

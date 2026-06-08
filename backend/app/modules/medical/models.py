@@ -18,6 +18,7 @@ class MedicalReport(Base):
     hospital: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     image_path: Mapped[str] = mapped_column(String, nullable=False)
     image_paths: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String, nullable=True, unique=True, index=True)
     status: Mapped[str] = mapped_column(String, default="parsed")  # uploaded/parsing/parsed/failed
     raw_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

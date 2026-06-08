@@ -84,7 +84,9 @@ Page({
               if (body.code === 0) {
                 resolve(body.data);
               } else {
-                reject(new Error(`code=${body.code} ${body.msg || ''}`));
+                const e = new Error(body.msg || `code=${body.code}`);
+                e.bizCode = body.code;
+                reject(e);
               }
             } catch (_e) {
               reject(new Error(`HTTP ${res.statusCode}: ${String(res.data).slice(0, 200)}`));
@@ -110,7 +112,7 @@ Page({
       })
       .catch((err) => {
         wx.showModal({
-          title: '识别失败',
+          title: err && err.bizCode === 4090 ? '重复上传' : '识别失败',
           content: (err && err.message) || '预解析失败',
           showCancel: false,
         });

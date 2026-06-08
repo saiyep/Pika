@@ -6,6 +6,7 @@ __pycache__/
 venv/
 env/
 ENV/
+.pytest_cache/
 
 # Env / secrets
 .env

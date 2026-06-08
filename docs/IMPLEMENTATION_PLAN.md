@@ -18,7 +18,7 @@
 
 - 挂载：`/volume1/Projects/Pika/data/uploads/medical` 与 `/data/db` → 容器 `/app/data/...`
 - 环境变量（NAS `.env`）：`WX_APPID/WX_SECRET` + `AZURE_OPENAI_ENDPOINT/API_KEY/API_VERSION/DEPLOYMENT`
-- 迁移：`create_all` 不补旧表列，改字段需删 `pika.db` 重建
+- 迁移：Alembic 管理；NAS 首次 `alembic stamp head` 后续 `alembic upgrade head`
 
 ## 验收标准
 
@@ -28,18 +28,16 @@
 4. 历史/详情/趋势显示 hospital
 5. 真机局域网连续成功 3 次
 
-## v0.2 工程底座（当前期）
+## v0.2 工程底座（已完成）
 
-PoC v0.1 已验证通过，本期目标是**打牢工程底座**，让后续 schema 变更与重构安全可控。按依赖排序：
+PoC v0.1 验证通过后，本期打牢工程底座，让 schema 变更与重构安全可控。五项均已实现并通过 pytest：
 
-1. **C1 Alembic 迁移**（基石）：替换 `create_all` 删库重建模式；C1 一通，后面所有改 schema 的 task 都不再丢数据。
-2. **C2 pytest 测试骨架**：`backend/tests/`，覆盖 vision 后处理纯逻辑 + draft/commit 流程；Azure 调用 mock 掉。是后续重构的安全网。
-3. **B1 删除报告接口**：`DELETE /api/medical/reports/{id}` + 历史页删除入口。改动小、不动 models，作为「首个走完整迁移+测试流程」的样板。
-4. **B2 重复上传去重**（依赖 C1）：加图片内容 hash 字段，commit 时按 hash 拦截重复。
-5. **C3 失败可观测**：上传失败的日志聚合/重试入口。
+1. **C1 Alembic 迁移** — 替换 `create_all`，env.py 复用 `settings.db_path`。
+2. **C2 pytest 测试骨架** — `backend/tests/`，vision 后处理 + draft/commit 流程（Azure mock）。
+3. **B1 删除报告** — `DELETE /reports/{id}`（删库删图）+ 历史页删除。
+4. **B2 重复上传去重** — `content_hash` 列，draft 阶段按图片内容全局判重。
+5. **C3 失败重解析** — `POST /reports/{id}/reparse`，对 failed 报告用原图重调 Azure。
 
-**依赖关系**：C1 → B2 / 后续子表化·成员管理；C2 → B1 及一切重构。C1、C2 是两个总闸。
-
-## 后续（v0.3+）
+## 后续（v0.3+，待排定）
 
 多图子表化、草稿持久化、成员管理与共享、公网 HTTPS。

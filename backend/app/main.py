@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.auth_router import router as auth_router
-from app.core.db import init_db
 from app.core.exceptions import PikaException
 from app.modules.medical.router import router as medical_router
 
@@ -19,11 +18,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
 
 
 @app.exception_handler(PikaException)
