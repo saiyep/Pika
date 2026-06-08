@@ -18,6 +18,7 @@ backend/data/
 
 # Node / 小程序
 miniprogram/node_modules/
+miniprogram/project.private.config.json
 dist/
 
 # IDE / OS

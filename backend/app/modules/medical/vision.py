@@ -19,9 +19,22 @@ def _client() -> AzureOpenAI:
     )
 
 
+def _sniff_mime(image_bytes: bytes) -> str:
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if image_bytes.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    if image_bytes[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    return "image/jpeg"
+
+
 def _data_url(image_bytes: bytes) -> str:
+    mime = _sniff_mime(image_bytes)
     b64 = base64.b64encode(image_bytes).decode()
-    return f"data:image/jpeg;base64,{b64}"
+    return f"data:{mime};base64,{b64}"
 
 
 def _loads_lenient(text: str) -> dict:

@@ -12,6 +12,11 @@
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f5f5f5"
   },
+  "networkTimeout": {
+    "request": 60000,
+    "uploadFile": 60000,
+    "downloadFile": 60000
+  },
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }

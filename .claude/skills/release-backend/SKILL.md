@@ -11,7 +11,7 @@ description: 把 Pika 后端代码发布到绿联 NAS 的 Docker 项目目录。
 - NAS 目录（Claude 有直接读写权限）：`//DH4300PLUS-D2E0/docker/pika`
 - 绿联用该目录 `docker-compose.yaml` 部署，`build.context: .` 要求 `Dockerfile`+`backend/` 同在该目录。
 - compose 仓库与 NAS 同名 `docker-compose.yaml`，直接复制即可；NAS 目录只应有这一个 compose 文件（遗留的 `.yml` 要删）。
-- 真实凭据在该目录 `.env`（不入 git），compose 用 `${...}` 占位。端口 8000；健康检查 `http://192.168.1.100:8000/health`。
+- 真实凭据在该目录 `.env`（不入 git），compose 用 `${...}` 占位。端口 8000；健康检查 `http://192.168.1.200:8000/health`。
 
 ## 红线
 - 不覆盖/删除 NAS 的 `.env`。
