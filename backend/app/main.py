@@ -10,6 +10,7 @@ from app.core.db import engine
 from app.core.exceptions import PikaException
 from app.core.user.router import router as user_router
 from app.modules.medical.router import router as medical_router
+from app.settings import settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,9 +27,14 @@ APP_VERSION = "0.2.0"
 
 app = FastAPI(title="Pika Family Service Platform")
 
+# WeChat Mini Program 请求不走浏览器 CORS（无 Origin 强制），CORS 主要影响浏览器/开发者工具调试。
+# 生产域名从 settings.public_domain（.env 注入）来，不硬编码；本地调试地址保留。
+_cors_origins = ["http://localhost", "http://127.0.0.1"]
+if settings.public_domain:
+    _cors_origins.insert(0, f"https://{settings.public_domain}")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # POC: WeChat Mini Program / dev tools
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

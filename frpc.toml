@@ -1,0 +1,15 @@
+serverAddr = "{{ .Envs.FRP_SERVER_ADDR }}"
+serverPort = 7000
+
+auth.method = "token"
+auth.token = "{{ .Envs.FRP_TOKEN }}"
+
+# 隧道流量 TLS 加密（防中间人监听）
+transport.tls.enable = true
+
+[[proxies]]
+name = "pika"
+type = "http"
+localIP = "pika-backend"
+localPort = 8000
+customDomains = ["{{ .Envs.PUBLIC_DOMAIN }}"]

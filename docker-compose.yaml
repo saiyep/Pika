@@ -28,3 +28,23 @@ services:
           cpus: "1.0"
           memory: 1024M
     restart: unless-stopped
+
+  # 内网穿透客户端：主动连 Azure VM 的 frps，把 pika-backend:8000 透到公网
+  # （家人微信走 https://<公网域名> → VM Caddy → frps → 此 frpc → pika-backend；域名/IP/token 在 .env）
+  frpc:
+    image: snowdreamtech/frpc:latest
+    container_name: pika-frpc
+    restart: unless-stopped
+    depends_on:
+      - pika-backend
+    environment:
+      - FRP_TOKEN=${FRP_TOKEN}
+      - FRP_SERVER_ADDR=${FRP_SERVER_ADDR}
+      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN}
+    volumes:
+      - ./frpc.toml:/etc/frp/frpc.toml:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M

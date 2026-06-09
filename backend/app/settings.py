@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # The family admin (this openid is always role=admin on login).
     admin_openid: str = ""
 
+    # Public domain (also used by frpc). Empty in local dev. CORS allows this.
+    public_domain: str = ""
+
     # Azure OpenAI (gpt-5.4-mini, vision)
     azure_openai_endpoint: str = ""
     azure_openai_api_key: str = ""

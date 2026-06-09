@@ -20,6 +20,7 @@ backend/data/
 # Node / 小程序
 miniprogram/node_modules/
 miniprogram/project.private.config.json
+miniprogram/config.local.js
 dist/
 
 # IDE / OS
