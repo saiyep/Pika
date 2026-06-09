@@ -103,8 +103,8 @@ def parse_report_image(image_bytes: bytes) -> tuple[dict, str]:
     """Call GPT-4.5-mini vision and return (parsed dict, raw model text).
 
     parsed = {report_type, report_type_label, report_date, metrics:[...normalized...]}.
-    Raises on hard failure (caller decides to mark report failed but keep image).
-    """
+    Also includes is_lab_report (bool) and hospital (str|None).
+    Raises on hard failure (caller decides to mark report failed but keep image)."""
     resp = _client().chat.completions.create(
         model=settings.azure_openai_deployment,
         messages=[
@@ -131,9 +131,11 @@ def parse_report_image(image_bytes: bytes) -> tuple[dict, str]:
             metrics.append(norm)
 
     parsed = {
+        "is_lab_report": data.get("is_lab_report", True),
         "report_type": data.get("report_type") or "unknown",
         "report_type_label": data.get("report_type_label"),
         "report_date": data.get("report_date"),
+        "hospital": data.get("hospital"),
         "metrics": metrics,
     }
     return parsed, raw_text

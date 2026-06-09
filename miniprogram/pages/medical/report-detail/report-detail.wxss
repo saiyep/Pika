@@ -13,3 +13,15 @@
 .c-value { flex: 1.5; text-align: right; color: #333; }
 .c-ref { flex: 2; text-align: right; color: #999; }
 .m-row.abnormal .c-value { color: #e64340; font-weight: 600; }
+.toolbar { display: flex; justify-content: flex-end; gap: 16rpx; margin-bottom: 16rpx; }
+.tool-btn { padding: 10rpx 28rpx; font-size: 26rpx; border-radius: 8rpx; background: #fff; color: #07c160; border: 1rpx solid #07c160; }
+.tool-btn.primary { background: #07c160; color: #fff; }
+.tool-btn.ghost { color: #888; border-color: #ccc; }
+.tool-btn.disabled { opacity: 0.5; }
+.edit-section { margin-bottom: 20rpx; }
+.field-label { display: block; font-size: 24rpx; color: #666; margin-bottom: 8rpx; }
+.field-input { background: #fff; border-radius: 12rpx; padding: 18rpx; font-size: 26rpx; }
+.picker { background: #fff; border-radius: 12rpx; padding: 18rpx; font-size: 26rpx; color: #333; }
+.picker + .field-input { margin-top: 12rpx; }
+.edit-metric { display: grid; grid-template-columns: 2fr 1.2fr 1fr 1.5fr; gap: 8rpx; padding: 8rpx 0; }
+.edit-metric input { background: #fff; border-radius: 8rpx; padding: 12rpx; font-size: 22rpx; }

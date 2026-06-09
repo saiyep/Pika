@@ -110,15 +110,19 @@ def create_draft_from_images(
     report_type = "unknown"
     report_type_label = None
     report_date = _parse_date(report_date_override)
+    hospital = hospital_override
+    is_lab_report = True
     metrics: list[dict] = []
     raw_json = None
     status = "parsed"
 
     try:
         parsed, raw_text = vision.parse_report_image(files[0][0])
+        is_lab_report = parsed["is_lab_report"]
         report_type = parsed["report_type"]
         report_type_label = parsed["report_type_label"]
         report_date = _parse_date(report_date_override or parsed["report_date"])
+        hospital = hospital_override or parsed["hospital"]
         metrics = parsed["metrics"]
         raw_json = raw_text
     except Exception as e:
@@ -133,10 +137,11 @@ def create_draft_from_images(
         "subject_id": subject_id,
         "image_paths": image_paths,
         "content_hash": content_hash,
+        "is_lab_report": is_lab_report,
         "report_type": report_type,
         "report_type_label": report_type_label,
         "report_date": report_date,
-        "hospital": hospital_override,
+        "hospital": hospital,
         "metrics": metrics,
         "raw_json": raw_json,
         "status": status,
@@ -260,6 +265,51 @@ def reparse_report(db: Session, *, report_id: int) -> MedicalReport | None:
         report.report_date = parsed_date
     report.raw_json = raw_text
     report.status = "parsed" if parsed["metrics"] else "failed"
+
+    db.commit()
+    db.refresh(report)
+    return report
+
+
+def update_report(
+    db: Session,
+    *,
+    report_id: int,
+    report_type: str,
+    report_type_label: str | None,
+    report_date: date | None,
+    hospital: str | None,
+    metrics: list[dict],
+) -> MedicalReport | None:
+    """Edit a stored report's header fields and metrics (user correction).
+    Image and content_hash are untouched. Returns None if not found.
+    """
+    report = db.get(MedicalReport, report_id)
+    if not report:
+        return None
+
+    report.report_type = report_type or "unknown"
+    report.report_type_label = report_type_label
+    report.report_date = report_date
+    report.hospital = hospital
+    report.metrics.clear()
+    for i, m in enumerate(metrics):
+        # Re-derive value_num/ref_low/ref_high/abnormal_flag from the edited
+        # text so the trend chart stays consistent after manual correction.
+        norm = vision._normalize_metric(
+            {
+                "item_name": m.get("item_name"),
+                "item_code": m.get("item_code"),
+                "value": m.get("value_text"),
+                "unit": m.get("unit"),
+                "ref_range": m.get("ref_range"),
+                "abnormal_flag": m.get("abnormal_flag"),
+            },
+            i,
+        )
+        if norm:
+            report.metrics.append(MedicalReportMetric(**norm))
+    report.status = "parsed" if report.metrics else report.status
 
     db.commit()
     db.refresh(report)

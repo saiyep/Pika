@@ -1,7 +1,10 @@
 <view class="page">
   <view class="section">
     <text class="section-title">医院</text>
-    <input class="input" placeholder="请输入医院名称" value="{{hospital}}" bindinput="onHospitalInput" />
+    <picker mode="selector" range="{{hospitalOptions}}" value="{{hospitalIndex}}" bindchange="onHospitalPick">
+      <view class="picker">{{hospitalOptions[hospitalIndex]}}</view>
+    </picker>
+    <input wx:if="{{hospitalIndex === hospitalOptions.length - 1}}" class="input" placeholder="请输入医院名称" value="{{hospitalCustom}}" bindinput="onHospitalCustomInput" />
   </view>
 
   <view wx:if="{{step === 'pick'}}">

@@ -24,6 +24,7 @@ from app.modules.medical.schemas import (
     ReportListItem,
     ReportListOut,
     ReportOut,
+    ReportUpdateIn,
     TrendOut,
     TrendPoint,
 )
@@ -83,6 +84,7 @@ async def create_report_draft(
     return ApiResponse.ok(
         DraftOut(
             draft_id=draft["draft_id"],
+            is_lab_report=draft["is_lab_report"],
             report_type=draft["report_type"],
             report_type_label=draft["report_type_label"],
             report_date=draft["report_date"],
@@ -173,6 +175,32 @@ def get_report(
 ):
     report = db.get(MedicalReport, report_id)
     if not report:
+        raise NotFoundError("report not found")
+    return ApiResponse.ok(
+        ReportDetailOut(
+            report=ReportOut.model_validate(report),
+            metrics=[MetricOut.model_validate(m) for m in report.metrics],
+        )
+    )
+
+
+@router.put("/reports/{report_id}", response_model=ApiResponse[ReportDetailOut])
+def update_report(
+    report_id: int,
+    body: ReportUpdateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    report = service.update_report(
+        db,
+        report_id=report_id,
+        report_type=body.report_type,
+        report_type_label=body.report_type_label,
+        report_date=body.report_date,
+        hospital=body.hospital,
+        metrics=[m.model_dump() for m in body.metrics],
+    )
+    if report is None:
         raise NotFoundError("report not found")
     return ApiResponse.ok(
         ReportDetailOut(

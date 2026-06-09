@@ -22,9 +22,11 @@ def tmp_upload(monkeypatch, tmp_path):
 
 
 _FAKE_PARSED = {
+    "is_lab_report": True,
     "report_type": "blood",
     "report_type_label": "血常规",
     "report_date": "2026-05-01",
+    "hospital": None,
     "metrics": [
         {
             "item_name": "WBC", "item_code": "WBC", "value_text": "11",
@@ -249,6 +251,76 @@ def test_reparse_recovers_failed_report(db_session, user, tmp_upload, monkeypatc
 
 def test_reparse_missing_report_returns_none(db_session):
     assert service.reparse_report(db_session, report_id=99999) is None
+
+
+def test_hospital_falls_back_to_parsed_when_no_override(db_session, user, tmp_upload, monkeypatch):
+    parsed = {**_FAKE_PARSED, "hospital": "北京协和医院"}
+    monkeypatch.setattr(vision, "parse_report_image", lambda b: (parsed, "{}"))
+
+    draft = service.create_draft_from_images(
+        db_session, uploader_id=user.id, subject_id=None,
+        files=[(b"\x89PNG\r\n\x1a\n h", "a.png", "image/png")], hospital_override=None,
+    )
+    assert draft["hospital"] == "北京协和医院"
+
+
+def test_hospital_override_wins_over_parsed(db_session, user, tmp_upload, monkeypatch):
+    parsed = {**_FAKE_PARSED, "hospital": "解析出的医院"}
+    monkeypatch.setattr(vision, "parse_report_image", lambda b: (parsed, "{}"))
+
+    draft = service.create_draft_from_images(
+        db_session, uploader_id=user.id, subject_id=None,
+        files=[(b"\x89PNG\r\n\x1a\n h2", "a.png", "image/png")], hospital_override="用户填的医院",
+    )
+    assert draft["hospital"] == "用户填的医院"
+
+
+def test_is_lab_report_flag_passed_to_draft(db_session, user, tmp_upload, monkeypatch):
+    parsed = {**_FAKE_PARSED, "is_lab_report": False, "metrics": []}
+    monkeypatch.setattr(vision, "parse_report_image", lambda b: (parsed, "{}"))
+
+    draft = service.create_draft_from_images(
+        db_session, uploader_id=user.id, subject_id=None,
+        files=[(b"\x89PNG\r\n\x1a\n notlab", "a.png", "image/png")], hospital_override="X",
+    )
+    assert draft["is_lab_report"] is False
+
+
+def test_update_report_edits_header_and_metrics(db_session, user, tmp_upload, monkeypatch):
+    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    draft = service.create_draft_from_images(
+        db_session, uploader_id=user.id, subject_id=None,
+        files=[(b"\x89PNG\r\n\x1a\n upd", "a.png", "image/png")], hospital_override="旧医院",
+    )
+    report = _commit(db_session, draft)
+
+    updated = service.update_report(
+        db_session,
+        report_id=report.id,
+        report_type="custom",
+        report_type_label="自定义标签",
+        report_date=None,
+        hospital="新医院",
+        metrics=[
+            {"item_name": "WBC", "item_code": "WBC", "value_text": "15",
+             "unit": "10^9/L", "ref_range": "4-9", "abnormal_flag": "unknown"}
+        ],
+    )
+
+    assert updated.hospital == "新医院"
+    assert updated.report_type_label == "自定义标签"
+    assert len(updated.metrics) == 1
+    # value re-derived from edited text: 15 > 9 -> high
+    assert updated.metrics[0].value_num == 15.0
+    assert updated.metrics[0].abnormal_flag == "high"
+
+
+def test_update_missing_report_returns_none(db_session):
+    assert service.update_report(
+        db_session, report_id=99999, report_type="blood",
+        report_type_label=None, report_date=None, hospital=None, metrics=[],
+    ) is None
+
 
 
 

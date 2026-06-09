@@ -112,6 +112,7 @@ class DraftMetric(BaseModel):
 
 class DraftOut(BaseModel):
     draft_id: str
+    is_lab_report: bool = True
     report_type: str
     report_type_label: str | None = None
     report_date: date | None = None
@@ -120,6 +121,14 @@ class DraftOut(BaseModel):
 
 
 class DraftCommitIn(BaseModel):
+    report_type: str = "unknown"
+    report_type_label: str | None = None
+    report_date: date | None = None
+    hospital: str | None = None
+    metrics: list[DraftMetric]
+
+
+class ReportUpdateIn(BaseModel):
     report_type: str = "unknown"
     report_type_label: str | None = None
     report_date: date | None = None

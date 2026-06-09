@@ -3,26 +3,71 @@
     <image src="{{imageUrl}}" mode="widthFix" bindtap="previewImage" />
   </view>
 
-  <view class="info">
-    <text class="type">{{report.report_type_label || report.report_type}}</text>
-    <text class="date">{{report.report_date || '日期未知'}} · {{report.hospital || '医院未知'}}</text>
+  <!-- 顶部操作栏 -->
+  <view class="toolbar">
+    <block wx:if="{{!editing}}">
+      <view class="tool-btn" bindtap="enterEdit">编辑</view>
+    </block>
+    <block wx:else>
+      <view class="tool-btn ghost" bindtap="cancelEdit">取消</view>
+      <view class="tool-btn primary {{saving ? 'disabled' : ''}}" bindtap="saveEdit">{{saving ? '保存中…' : '保存'}}</view>
+    </block>
   </view>
 
-  <view wx:if="{{report.status === 'failed'}}" class="failed-tip">
-    识别失败，原图已保存
-    <button class="reparse-btn" size="mini" loading="{{reparsing}}" bindtap="onReparse">重新解析</button>
-  </view>
+  <!-- 只读态 -->
+  <block wx:if="{{!editing}}">
+    <view class="info">
+      <text class="type">{{report.report_type_label || report.report_type}}</text>
+      <text class="date">{{report.report_date || '日期未知'}} · {{report.hospital || '医院未知'}}</text>
+    </view>
 
-  <view class="metrics">
-    <view class="m-head">
-      <text class="c-name">项目</text>
-      <text class="c-value">结果</text>
-      <text class="c-ref">参考范围</text>
+    <view wx:if="{{report.status === 'failed'}}" class="failed-tip">
+      识别失败，原图已保存
+      <button class="reparse-btn" size="mini" loading="{{reparsing}}" bindtap="onReparse">重新解析</button>
     </view>
-    <view wx:for="{{metrics}}" wx:key="seq" class="m-row {{item.abnormal_flag === 'high' || item.abnormal_flag === 'low' ? 'abnormal' : ''}}">
-      <text class="c-name">{{item.item_name}}</text>
-      <text class="c-value">{{item.value_text}} {{item.unit || ''}}</text>
-      <text class="c-ref">{{item.ref_range || '—'}}</text>
+
+    <view class="metrics">
+      <view class="m-head">
+        <text class="c-name">项目</text>
+        <text class="c-value">结果</text>
+        <text class="c-ref">参考范围</text>
+      </view>
+      <view wx:for="{{metrics}}" wx:key="seq" class="m-row {{item.abnormal_flag === 'high' || item.abnormal_flag === 'low' ? 'abnormal' : ''}}">
+        <text class="c-name">{{item.item_name}}</text>
+        <text class="c-value">{{item.value_text}} {{item.unit || ''}}</text>
+        <text class="c-ref">{{item.ref_range || '—'}}</text>
+      </view>
     </view>
-  </view>
+  </block>
+
+  <!-- 编辑态 -->
+  <block wx:else>
+    <view class="edit-section">
+      <text class="field-label">医院</text>
+      <picker mode="selector" range="{{hospitalOptions}}" value="{{hospitalIndex}}" bindchange="onHospitalPick">
+        <view class="picker">{{hospitalOptions[hospitalIndex]}}</view>
+      </picker>
+      <input wx:if="{{hospitalIndex === hospitalOptions.length - 1}}" class="field-input" placeholder="请输入医院名称" value="{{hospitalCustom}}" bindinput="onHospitalCustomInput" />
+    </view>
+
+    <view class="edit-section">
+      <text class="field-label">报告类型标签</text>
+      <input class="field-input" placeholder="如：血常规" value="{{editLabel}}" bindinput="onLabelInput" />
+    </view>
+
+    <view class="edit-section">
+      <text class="field-label">报告日期 (YYYY-MM-DD)</text>
+      <input class="field-input" placeholder="如：2026-05-30" value="{{editDate}}" bindinput="onDateInput" />
+    </view>
+
+    <view class="edit-section">
+      <text class="field-label">指标（名称 / 结果 / 单位 / 参考范围）</text>
+      <view wx:for="{{editMetrics}}" wx:key="index" class="edit-metric">
+        <input class="em-name" data-idx="{{index}}" data-field="item_name" value="{{item.item_name}}" bindinput="onMetricFieldInput" />
+        <input class="em-value" data-idx="{{index}}" data-field="value_text" value="{{item.value_text}}" bindinput="onMetricFieldInput" />
+        <input class="em-unit" data-idx="{{index}}" data-field="unit" value="{{item.unit}}" bindinput="onMetricFieldInput" />
+        <input class="em-ref" data-idx="{{index}}" data-field="ref_range" value="{{item.ref_range}}" bindinput="onMetricFieldInput" />
+      </view>
+    </view>
+  </block>
 </view>
