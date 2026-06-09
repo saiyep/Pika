@@ -8,6 +8,7 @@ from sqlalchemy import text
 from app.core.auth_router import router as auth_router
 from app.core.db import engine
 from app.core.exceptions import PikaException
+from app.core.user.router import router as user_router
 from app.modules.medical.router import router as medical_router
 
 logging.basicConfig(
@@ -64,4 +65,5 @@ def health():
 
 
 app.include_router(auth_router)
+app.include_router(user_router)
 app.include_router(medical_router)

@@ -33,10 +33,10 @@
           </view>
         </view>
         <text
-          class="svc-fav {{favoriteKeys.indexOf(item.key) >= 0 ? 'on' : ''}}"
+          class="svc-fav {{item.isFav ? 'on' : ''}}"
           data-key="{{item.key}}"
           catchtap="toggleFavorite"
-        >{{favoriteKeys.indexOf(item.key) >= 0 ? '★' : '☆'}}</text>
+        >{{item.isFav ? '★' : '☆'}}</text>
       </view>
     </scroll-view>
   </view>

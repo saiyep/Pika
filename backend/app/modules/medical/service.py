@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core import storage
 from app.core.exceptions import DuplicateReportError
 from app.modules.medical import vision
-from app.modules.medical.models import MedicalReport, MedicalReportMetric, UserFavoriteService
+from app.modules.medical.models import MedicalReport, MedicalReportMetric
 
 logger = logging.getLogger(__name__)
 
@@ -280,6 +280,7 @@ def update_report(
     report_date: date | None,
     hospital: str | None,
     metrics: list[dict],
+    subject_id: int | None = None,
 ) -> MedicalReport | None:
     """Edit a stored report's header fields and metrics (user correction).
     Image and content_hash are untouched. Returns None if not found.
@@ -292,6 +293,8 @@ def update_report(
     report.report_type_label = report_type_label
     report.report_date = report_date
     report.hospital = hospital
+    if subject_id is not None:
+        report.subject_id = subject_id
     report.metrics.clear()
     for i, m in enumerate(metrics):
         # Re-derive value_num/ref_low/ref_high/abnormal_flag from the edited
@@ -314,27 +317,3 @@ def update_report(
     db.commit()
     db.refresh(report)
     return report
-
-
-def list_favorites(db: Session, *, user_id: int) -> list[str]:
-    rows = db.query(UserFavoriteService.service_key).filter_by(user_id=user_id).all()
-    return [r[0] for r in rows]
-
-
-def add_favorite(db: Session, *, user_id: int, service_key: str) -> None:
-    exists = (
-        db.query(UserFavoriteService.id)
-        .filter_by(user_id=user_id, service_key=service_key)
-        .first()
-    )
-    if exists:
-        return
-    db.add(UserFavoriteService(user_id=user_id, service_key=service_key))
-    db.commit()
-
-
-def remove_favorite(db: Session, *, user_id: int, service_key: str) -> None:
-    db.query(UserFavoriteService).filter_by(
-        user_id=user_id, service_key=service_key
-    ).delete()
-    db.commit()

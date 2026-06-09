@@ -43,3 +43,18 @@ def save_image(content: bytes, filename: str | None, content_type: str | None) -
 
 def abs_path(relative_path: str) -> str:
     return os.path.join(settings.upload_dir, relative_path)
+
+
+def save_avatar(content: bytes, filename: str | None, content_type: str | None) -> str:
+    """Save a user avatar under avatar_dir; return a RELATIVE path
+    (relative to AVATAR_DIR, rejoined at read time via avatar_abs_path())."""
+    os.makedirs(settings.avatar_dir, exist_ok=True)
+    ext = _ext_from(filename, content_type)
+    name = f"{uuid.uuid4().hex}{ext}"
+    with open(os.path.join(settings.avatar_dir, name), "wb") as f:
+        f.write(content)
+    return name
+
+
+def avatar_abs_path(relative_path: str) -> str:
+    return os.path.join(settings.avatar_dir, relative_path)

@@ -3,6 +3,8 @@
 .empty { text-align: center; color: #999; margin-top: 120rpx; font-size: 28rpx; }
 .member { display: flex; align-items: center; justify-content: space-between; background: #fff; border-radius: 12rpx; padding: 28rpx 24rpx; margin-bottom: 16rpx; }
 .info { display: flex; align-items: center; gap: 16rpx; }
+.m-avatar { width: 64rpx; height: 64rpx; border-radius: 32rpx; }
+.m-avatar-ph { width: 64rpx; height: 64rpx; border-radius: 32rpx; background: #07c160; color: #fff; font-size: 30rpx; display: flex; align-items: center; justify-content: center; }
 .name { font-size: 30rpx; color: #222; }
 .role { font-size: 22rpx; color: #888; background: #f0f0f0; border-radius: 6rpx; padding: 4rpx 14rpx; }
 .role.admin { color: #07c160; background: #e7f9ef; }

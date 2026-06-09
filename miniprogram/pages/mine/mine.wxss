@@ -1,10 +1,26 @@
 .page { padding: 32rpx; }
 .profile { display: flex; align-items: center; background: #fff; border-radius: 16rpx; padding: 40rpx 32rpx; margin-bottom: 32rpx; }
 .avatar { width: 96rpx; height: 96rpx; border-radius: 48rpx; background: #07c160; color: #fff; font-size: 44rpx; display: flex; align-items: center; justify-content: center; margin-right: 24rpx; }
-.profile-text { display: flex; flex-direction: column; }
+.avatar-img { width: 96rpx; height: 96rpx; border-radius: 48rpx; margin-right: 24rpx; }
+.profile-text { display: flex; flex-direction: column; flex: 1; }
 .name { font-size: 36rpx; font-weight: 600; color: #222; }
 .role { margin-top: 10rpx; font-size: 22rpx; color: #888; background: #f0f0f0; border-radius: 6rpx; padding: 4rpx 16rpx; align-self: flex-start; }
 .role.admin { color: #07c160; background: #e7f9ef; }
+.edit-hint { font-size: 26rpx; color: #bbb; }
+
+.profile-edit { background: #fff; border-radius: 16rpx; padding: 40rpx 32rpx; margin-bottom: 32rpx; display: flex; flex-direction: column; align-items: center; }
+.avatar-btn { padding: 0; background: transparent; line-height: normal; }
+.avatar-btn::after { border: none; }
+.avatar-btn .avatar, .avatar-btn .avatar-img { margin: 0; width: 120rpx; height: 120rpx; border-radius: 60rpx; }
+.avatar-tip { font-size: 24rpx; color: #999; margin-top: 16rpx; }
+.nickname-row { display: flex; align-items: center; width: 100%; margin-top: 32rpx; padding-top: 24rpx; border-top: 1rpx solid #f0f0f0; }
+.nk-label { font-size: 28rpx; color: #666; width: 100rpx; }
+.nk-input { flex: 1; font-size: 30rpx; padding: 12rpx 0; }
+.edit-actions { display: flex; gap: 24rpx; margin-top: 32rpx; width: 100%; }
+.act { flex: 1; font-size: 28rpx; border-radius: 10rpx; }
+.act.primary { background: #07c160; color: #fff; }
+.act.ghost { background: #f2f2f2; color: #666; }
+
 .menu { background: #fff; border-radius: 16rpx; overflow: hidden; }
 .menu-item { display: flex; align-items: center; justify-content: space-between; padding: 32rpx; border-bottom: 1rpx solid #f0f0f0; }
 .menu-item:last-child { border-bottom: none; }

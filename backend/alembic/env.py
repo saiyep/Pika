@@ -8,6 +8,7 @@ from app.settings import settings
 
 # Import models so they register on Base.metadata for autogenerate.
 from app.core import models_base  # noqa: F401
+from app.core.user import models as user_models  # noqa: F401
 from app.modules.medical import models  # noqa: F401
 
 config = context.config

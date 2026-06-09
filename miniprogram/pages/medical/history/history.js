@@ -1,47 +1,105 @@
 const { request } = require('../../../utils/request');
 
+const TIME_RANGES = ['全部时间', '过去1个月', '过去3个月', '过去半年', '过去1年', '自定义'];
+const CUSTOM_INDEX = TIME_RANGES.length - 1;
+
+function pad(n) {
+  return n < 10 ? '0' + n : '' + n;
+}
+function ymd(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function monthsAgo(n) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - n);
+  return ymd(d);
+}
+
 Page({
   data: {
     items: [],
-    // 被检查人 filter：第 0 项是"全家"，其余是各成员
-    filterLabels: ['全家'],
+    // 被检查者
     members: [],
-    filterIndex: 0,
+    subjectLabels: ['全家'],
+    subjectIndex: 0,
+    // 医院
+    hospitals: [],
+    hospitalLabels: ['全部医院'],
+    hospitalIndex: 0,
+    // 时间范围
+    timeRanges: TIME_RANGES,
+    timeIndex: 0,
+    customFrom: '',
+    customTo: '',
+    showCustom: false,
   },
   onShow() {
-    this.loadMembers();
+    this.bootstrap();
   },
-  loadMembers() {
-    request({ url: '/api/medical/members' })
-      .then((data) => {
-        const members = data.items || [];
-        const myId = (getApp().globalData.user && getApp().globalData.user.id) || null;
-        // 默认选中"自己"；找不到则退回"全家"。
-        let idx = members.findIndex((m) => m.id === myId);
-        idx = idx < 0 ? 0 : idx + 1; // +1 因为第 0 项是"全家"
-        this.setData(
-          {
-            members,
-            filterLabels: ['全家', ...members.map((m) => m.nickname || ('用户' + m.id))],
-            filterIndex: idx,
-          },
-          () => this.load()
-        );
-      })
-      .catch(() => {
-        this.load();
-      });
+  bootstrap() {
+    // 拉成员 + 医院，然后加载列表
+    Promise.all([
+      request({ url: '/api/user/members' }).catch(() => ({ items: [] })),
+      request({ url: '/api/medical/hospitals' }).catch(() => []),
+    ]).then(([m, hospitals]) => {
+      const members = m.items || [];
+      const myId = (getApp().globalData.user && getApp().globalData.user.id) || null;
+      let sidx = members.findIndex((x) => x.id === myId);
+      sidx = sidx < 0 ? 0 : sidx + 1;
+      this.setData(
+        {
+          members,
+          subjectLabels: ['全家', ...members.map((x) => x.nickname || ('用户' + x.id))],
+          subjectIndex: sidx,
+          hospitals: hospitals || [],
+          hospitalLabels: ['全部医院', ...(hospitals || [])],
+        },
+        () => this.load()
+      );
+    });
   },
-  onFilterPick(e) {
-    this.setData({ filterIndex: Number(e.detail.value) }, () => this.load());
+
+  onSubjectPick(e) {
+    this.setData({ subjectIndex: Number(e.detail.value) }, () => this.load());
   },
-  load() {
-    let url = '/api/medical/reports?page=1&size=50';
-    if (this.data.filterIndex > 0) {
-      const m = this.data.members[this.data.filterIndex - 1];
-      if (m) url += '&subject_id=' + m.id;
+  onHospitalPick(e) {
+    this.setData({ hospitalIndex: Number(e.detail.value) }, () => this.load());
+  },
+  onTimePick(e) {
+    const idx = Number(e.detail.value);
+    this.setData({ timeIndex: idx, showCustom: idx === CUSTOM_INDEX }, () => {
+      if (idx !== CUSTOM_INDEX) this.load();
+    });
+  },
+  onCustomFrom(e) {
+    this.setData({ customFrom: e.detail.value }, () => this.load());
+  },
+  onCustomTo(e) {
+    this.setData({ customTo: e.detail.value }, () => this.load());
+  },
+
+  buildQuery() {
+    const parts = ['page=1', 'size=50'];
+    if (this.data.subjectIndex > 0) {
+      const m = this.data.members[this.data.subjectIndex - 1];
+      if (m) parts.push('subject_id=' + m.id);
     }
-    request({ url })
+    if (this.data.hospitalIndex > 0) {
+      parts.push('hospital=' + encodeURIComponent(this.data.hospitalLabels[this.data.hospitalIndex]));
+    }
+    const ti = this.data.timeIndex;
+    if (ti >= 1 && ti <= 4) {
+      const map = { 1: 1, 2: 3, 3: 6, 4: 12 };
+      parts.push('date_from=' + monthsAgo(map[ti]));
+    } else if (ti === CUSTOM_INDEX) {
+      if (this.data.customFrom) parts.push('date_from=' + this.data.customFrom);
+      if (this.data.customTo) parts.push('date_to=' + this.data.customTo);
+    }
+    return parts.join('&');
+  },
+
+  load() {
+    request({ url: '/api/medical/reports?' + this.buildQuery() })
       .then((data) => {
         this.setData({ items: data.items });
       })

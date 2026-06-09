@@ -9,8 +9,8 @@ from app.core import storage
 from app.core.db import get_db
 from app.core.deps import get_current_user
 from app.core.exceptions import NotFoundError, VisionParseError
-from app.core.models_base import User
 from app.core.schemas_base import ApiResponse
+from app.core.user.models import User
 from app.modules.medical import service
 from app.modules.medical.models import MedicalReport, MedicalReportMetric
 from app.modules.medical.schemas import (
@@ -19,20 +19,14 @@ from app.modules.medical.schemas import (
     DraftCommitIn,
     DraftMetric,
     DraftOut,
-    FavoriteIn,
-    FavoriteListOut,
-    MemberItem,
-    MemberListOut,
     MetricOut,
     ReportDetailOut,
     ReportListItem,
     ReportListOut,
     ReportOut,
     ReportUpdateIn,
-    RoleUpdateIn,
     TrendOut,
     TrendPoint,
-    UserOut,
 )
 
 router = APIRouter(prefix="/api/medical", tags=["medical"])
@@ -46,74 +40,6 @@ def _detail_out(db: Session, report: MedicalReport) -> ReportDetailOut:
     return ReportDetailOut(
         report=out,
         metrics=[MetricOut.model_validate(m) for m in report.metrics],
-    )
-
-
-@router.get("/members", response_model=ApiResponse[MemberListOut])
-def list_members(
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    members = db.query(User).order_by(User.id.asc()).all()
-    return ApiResponse.ok(
-        MemberListOut(items=[MemberItem.model_validate(m) for m in members])
-    )
-
-
-@router.get("/whoami", response_model=ApiResponse[UserOut])
-def whoami(user: User = Depends(get_current_user)):
-    """Return the current logged-in user (incl. openid) — used to look up your
-    own openid for ADMIN_OPENID config."""
-    return ApiResponse.ok(UserOut.model_validate(user))
-
-
-@router.put("/members/{member_id}/role", response_model=ApiResponse[MemberItem])
-def set_member_role(
-    member_id: int,
-    body: RoleUpdateIn,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    member = db.get(User, member_id)
-    if not member:
-        raise NotFoundError("member not found")
-    member.role = body.role
-    db.commit()
-    db.refresh(member)
-    return ApiResponse.ok(MemberItem.model_validate(member))
-
-
-@router.get("/favorites", response_model=ApiResponse[FavoriteListOut])
-def list_favorites(
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    return ApiResponse.ok(
-        FavoriteListOut(service_keys=service.list_favorites(db, user_id=user.id))
-    )
-
-
-@router.post("/favorites", response_model=ApiResponse[FavoriteListOut])
-def add_favorite(
-    body: FavoriteIn,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    service.add_favorite(db, user_id=user.id, service_key=body.service_key)
-    return ApiResponse.ok(
-        FavoriteListOut(service_keys=service.list_favorites(db, user_id=user.id))
-    )
-
-
-@router.delete("/favorites/{service_key}", response_model=ApiResponse[FavoriteListOut])
-def remove_favorite(
-    service_key: str,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    service.remove_favorite(db, user_id=user.id, service_key=service_key)
-    return ApiResponse.ok(
-        FavoriteListOut(service_keys=service.list_favorites(db, user_id=user.id))
     )
 
 
@@ -201,6 +127,9 @@ def commit_report_draft(
 def list_reports(
     subject_id: int | None = Query(default=None),
     report_type: str | None = Query(default=None),
+    hospital: str | None = Query(default=None),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -211,10 +140,20 @@ def list_reports(
         q = q.filter(MedicalReport.subject_id == subject_id)
     if report_type:
         q = q.filter(MedicalReport.report_type == report_type)
+    if hospital:
+        q = q.filter(MedicalReport.hospital == hospital)
+    if date_from:
+        q = q.filter(MedicalReport.report_date >= date_from)
+    if date_to:
+        q = q.filter(MedicalReport.report_date <= date_to)
 
     total = q.count()
     rows = (
-        q.order_by(MedicalReport.created_at.desc())
+        q.order_by(
+            MedicalReport.report_date.is_(None),  # nulls last
+            MedicalReport.report_date.desc(),
+            MedicalReport.created_at.desc(),
+        )
         .offset((page - 1) * size)
         .limit(size)
         .all()
@@ -244,6 +183,20 @@ def list_reports(
     return ApiResponse.ok(ReportListOut(total=total, items=items))
 
 
+@router.get("/hospitals", response_model=ApiResponse[list[str]])
+def list_hospitals(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    rows = (
+        db.query(MedicalReport.hospital)
+        .filter(MedicalReport.hospital.isnot(None))
+        .distinct()
+        .all()
+    )
+    return ApiResponse.ok(sorted(r[0] for r in rows if r[0]))
+
+
 @router.get("/reports/{report_id}", response_model=ApiResponse[ReportDetailOut])
 def get_report(
     report_id: int,
@@ -270,6 +223,7 @@ def update_report(
         report_type_label=body.report_type_label,
         report_date=body.report_date,
         hospital=body.hospital,
+        subject_id=body.subject_id,
         metrics=[m.model_dump() for m in body.metrics],
     )
     if report is None:

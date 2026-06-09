@@ -10,27 +10,29 @@ Page({
   data: {
     categories: CATEGORIES,
     categoryIndex: 0,
-    services: SERVICES,
-    visibleServices: SERVICES,
+    visibleServices: [],
     favoriteKeys: [],
     favoriteServices: [],
   },
 
   onShow() {
-    this.applyCategory();
     this.loadFavorites();
   },
 
   loadFavorites() {
-    request({ url: '/api/medical/favorites' })
-      .then((data) => {
-        const keys = data.service_keys || [];
-        this.setData({
-          favoriteKeys: keys,
-          favoriteServices: SERVICES.filter((s) => keys.indexOf(s.key) >= 0),
-        });
-      })
-      .catch(() => {});
+    request({ url: '/api/user/favorites' })
+      .then((data) => this.applyFavorites(data.service_keys || []))
+      .catch(() => this.applyFavorites(this.data.favoriteKeys));
+  },
+
+  applyFavorites(keys) {
+    this.setData(
+      {
+        favoriteKeys: keys,
+        favoriteServices: SERVICES.filter((s) => keys.indexOf(s.key) >= 0),
+      },
+      () => this.applyCategory()
+    );
   },
 
   onCategoryPick(e) {
@@ -40,8 +42,11 @@ Page({
 
   applyCategory() {
     const cat = this.data.categories[this.data.categoryIndex];
-    const visible = cat === '全部' ? SERVICES : SERVICES.filter((s) => s.category === cat);
-    this.setData({ visibleServices: visible });
+    const keys = this.data.favoriteKeys;
+    const list = (cat === '全部' ? SERVICES : SERVICES.filter((s) => s.category === cat)).map(
+      (s) => ({ ...s, isFav: keys.indexOf(s.key) >= 0 })
+    );
+    this.setData({ visibleServices: list });
   },
 
   openService(e) {
@@ -53,15 +58,11 @@ Page({
     const key = e.currentTarget.dataset.key;
     const isFav = this.data.favoriteKeys.indexOf(key) >= 0;
     const req = isFav
-      ? request({ url: `/api/medical/favorites/${key}`, method: 'DELETE' })
-      : request({ url: '/api/medical/favorites', method: 'POST', data: { service_key: key } });
+      ? request({ url: `/api/user/favorites/${key}`, method: 'DELETE' })
+      : request({ url: '/api/user/favorites', method: 'POST', data: { service_key: key } });
     req
       .then((data) => {
-        const keys = data.service_keys || [];
-        this.setData({
-          favoriteKeys: keys,
-          favoriteServices: SERVICES.filter((s) => keys.indexOf(s.key) >= 0),
-        });
+        this.applyFavorites(data.service_keys || []);
         wx.showToast({ title: isFav ? '已取消关注' : '已关注', icon: 'none' });
       })
       .catch(() => {

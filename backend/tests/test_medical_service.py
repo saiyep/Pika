@@ -1,6 +1,6 @@
 import pytest
 
-from app.core.models_base import User
+from app.core.user.models import User
 from app.modules.medical import service, vision
 
 
@@ -363,31 +363,3 @@ def test_list_filter_by_subject(db_session, user, tmp_upload, monkeypatch):
     assert mom_reports[0].subject_id == mom.id
 
 
-
-
-
-
-
-def test_favorites_add_list_remove(db_session, user):
-    assert service.list_favorites(db_session, user_id=user.id) == []
-
-    service.add_favorite(db_session, user_id=user.id, service_key="medical")
-    service.add_favorite(db_session, user_id=user.id, service_key="medical")  # idempotent
-    assert service.list_favorites(db_session, user_id=user.id) == ["medical"]
-
-    service.add_favorite(db_session, user_id=user.id, service_key="billing")
-    assert set(service.list_favorites(db_session, user_id=user.id)) == {"medical", "billing"}
-
-    service.remove_favorite(db_session, user_id=user.id, service_key="medical")
-    assert service.list_favorites(db_session, user_id=user.id) == ["billing"]
-
-
-def test_favorites_are_per_user(db_session, user):
-    other = User(openid="other", nickname="他")
-    db_session.add(other)
-    db_session.commit()
-    db_session.refresh(other)
-
-    service.add_favorite(db_session, user_id=user.id, service_key="medical")
-    assert service.list_favorites(db_session, user_id=user.id) == ["medical"]
-    assert service.list_favorites(db_session, user_id=other.id) == []

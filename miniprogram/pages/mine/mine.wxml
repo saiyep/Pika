@@ -1,9 +1,37 @@
 <view class="page">
-  <view class="profile">
-    <view class="avatar">{{nickname ? nickname[0] : '?'}}</view>
-    <view class="profile-text">
+  <!-- 只读态 -->
+  <view wx:if="{{!editing}}" class="profile" bindtap="startEdit">
+    <image wx:if="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" />
+    <view wx:else class="avatar">{{initial}}</view>    <view class="profile-text">
       <text class="name">{{nickname}}</text>
       <text class="role {{isAdmin ? 'admin' : ''}}">{{roleLabel}}</text>
+    </view>
+    <text class="edit-hint">编辑 ›</text>
+  </view>
+
+  <!-- 编辑态 -->
+  <view wx:else class="profile-edit">
+    <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+      <image wx:if="{{pendingAvatar}}" class="avatar-img" src="{{pendingAvatar}}" mode="aspectFill" />
+      <image wx:elif="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" />
+      <view wx:else class="avatar">+</view>
+    </button>
+    <text class="avatar-tip">点击选择微信头像</text>
+
+    <view class="nickname-row">
+      <text class="nk-label">昵称</text>
+      <input
+        class="nk-input"
+        type="nickname"
+        placeholder="点击填写微信昵称"
+        value="{{editNickname}}"
+        bindinput="onNicknameInput"
+      />
+    </view>
+
+    <view class="edit-actions">
+      <button class="act ghost" bindtap="cancelEdit">取消</button>
+      <button class="act primary" bindtap="saveProfile">保存</button>
     </view>
   </view>
 

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # Runtime paths
     data_dir: str = "./data"
     upload_dir: str = "./data/uploads/medical"
+    avatar_dir: str = "./data/avatars"
     db_path: str = "./data/db/pika.db"
 
 

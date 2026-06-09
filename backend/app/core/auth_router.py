@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.models_base import User
 from app.core.schemas_base import ApiResponse
+from app.core.user.models import User
+from app.core.user.schemas import LoginIn, LoginOut, UserOut
 from app.core.wechat import code_to_openid
 from app.settings import settings
-from app.modules.medical.schemas import LoginIn, LoginOut, UserOut
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -31,5 +31,7 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
+    out = UserOut.model_validate(user)
+    out.avatar_url = f"/api/user/{user.id}/avatar" if user.avatar_path else None
     # POC: token == openid
-    return ApiResponse.ok(LoginOut(token=openid, user=UserOut.model_validate(user)))
+    return ApiResponse.ok(LoginOut(token=openid, user=out))

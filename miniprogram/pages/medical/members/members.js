@@ -1,3 +1,4 @@
+const { BASE_URL } = require('../../../config');
 const { request } = require('../../../utils/request');
 
 Page({
@@ -12,7 +13,7 @@ Page({
     this.load();
   },
   load() {
-    request({ url: '/api/medical/members' })
+    request({ url: '/api/user/members' })
       .then((data) => {
         this.setData({ members: this.decorate(data.items || []) });
       })
@@ -21,11 +22,16 @@ Page({
       });
   },
   decorate(items) {
-    return items.map((m) => ({
-      ...m,
-      roleLabel: m.role === 'admin' ? '管理员' : '普通用户',
-      isMe: m.id === this.data.myId,
-    }));
+    return items.map((m) => {
+      const name = m.nickname || ('用户' + m.id);
+      return {
+        ...m,
+        roleLabel: m.role === 'admin' ? '管理员' : '普通用户',
+        isMe: m.id === this.data.myId,
+        avatarUrl: m.avatar_url ? BASE_URL + m.avatar_url : '',
+        initial: name[0],
+      };
+    });
   },
   onToggleRole(e) {
     const id = Number(e.currentTarget.dataset.id);
@@ -36,7 +42,7 @@ Page({
       content: `确定将该成员设为${next === 'admin' ? '管理员' : '普通用户'}？`,
       success: (res) => {
         if (!res.confirm) return;
-        request({ url: `/api/medical/members/${id}/role`, method: 'PUT', data: { role: next } })
+        request({ url: `/api/user/members/${id}/role`, method: 'PUT', data: { role: next } })
           .then(() => {
             this.load();
             wx.showToast({ title: '已修改', icon: 'success' });

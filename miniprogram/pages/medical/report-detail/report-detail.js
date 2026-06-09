@@ -22,6 +22,7 @@ Page({
     metrics: [],
     imageUrl: '',
     reportId: '',
+    uploadedAt: '',
     reparsing: false,
     editing: false,
     saving: false,
@@ -32,20 +33,42 @@ Page({
     hospitalOptions: HOSPITAL_OPTIONS,
     hospitalIndex: OTHER_INDEX,
     hospitalCustom: '',
+    // 被检查者
+    members: [],
+    memberLabels: [],
+    subjectIndex: 0,
   },
   onLoad(query) {
     const id = query.id;
     this.setData({ reportId: id, imageUrl: BASE_URL + '/api/medical/reports/' + id + '/image' });
+    this.loadMembers();
     this.load();
+  },
+  loadMembers() {
+    request({ url: '/api/user/members' })
+      .then((data) => {
+        const members = data.items || [];
+        this.setData({ members, memberLabels: members.map((m) => m.nickname || ('用户' + m.id)) });
+      })
+      .catch(() => {});
   },
   load() {
     request({ url: '/api/medical/reports/' + this.data.reportId })
       .then((data) => {
-        this.setData({ report: data.report, metrics: data.metrics });
+        this.setData({
+          report: data.report,
+          metrics: data.metrics,
+          uploadedAt: this.fmtTime(data.report.created_at),
+        });
       })
       .catch(() => {
         wx.showToast({ title: '加载失败', icon: 'none' });
       });
+  },
+  fmtTime(s) {
+    if (!s) return '';
+    // 后端 created_at 形如 "2026-06-09T08:30:00"，截到分钟，空格分隔
+    return String(s).replace('T', ' ').slice(0, 16);
   },
   previewImage() {
     if (this.data.imageUrl) {
@@ -56,6 +79,8 @@ Page({
   enterEdit() {
     const r = this.data.report;
     const matched = matchHospital(r.hospital);
+    let sidx = this.data.members.findIndex((m) => m.id === r.subject_id);
+    if (sidx < 0) sidx = 0;
     this.setData({
       editing: true,
       editLabel: r.report_type_label || '',
@@ -70,6 +95,7 @@ Page({
       })),
       hospitalIndex: matched.index,
       hospitalCustom: matched.custom,
+      subjectIndex: sidx,
     });
   },
   cancelEdit() {
@@ -86,6 +112,13 @@ Page({
   },
   onHospitalCustomInput(e) {
     this.setData({ hospitalCustom: e.detail.value || '' });
+  },
+  onSubjectPick(e) {
+    this.setData({ subjectIndex: Number(e.detail.value) });
+  },
+  subjectId() {
+    const m = this.data.members[this.data.subjectIndex];
+    return m ? m.id : null;
   },
   onLabelInput(e) {
     this.setData({ editLabel: e.detail.value || '' });
@@ -112,11 +145,17 @@ Page({
         report_type_label: label,
         report_date: this.data.editDate || null,
         hospital: this.resolvedHospital() || null,
+        subject_id: this.subjectId(),
         metrics: this.data.editMetrics,
       },
     })
       .then((data) => {
-        this.setData({ report: data.report, metrics: data.metrics, editing: false });
+        this.setData({
+          report: data.report,
+          metrics: data.metrics,
+          editing: false,
+          uploadedAt: this.fmtTime(data.report.created_at),
+        });
         wx.showToast({ title: '已保存', icon: 'success' });
       })
       .catch(() => {

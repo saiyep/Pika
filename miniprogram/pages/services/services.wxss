@@ -20,5 +20,5 @@
 .svc-text { display: flex; flex-direction: column; }
 .svc-name { font-size: 30rpx; color: #222; font-weight: 600; }
 .svc-cat { font-size: 22rpx; color: #999; margin-top: 4rpx; }
-.svc-fav { font-size: 40rpx; color: #ccc; padding: 0 8rpx; }
+.svc-fav { font-size: 44rpx; color: #ddd; padding: 0 12rpx; }
 .svc-fav.on { color: #fa8c16; }

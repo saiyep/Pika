@@ -42,7 +42,7 @@ Page({
   },
 
   loadMembers() {
-    request({ url: '/api/medical/members' })
+    request({ url: '/api/user/members' })
       .then((data) => {
         const members = data.items || [];
         const myId = (getApp().globalData.user && getApp().globalData.user.id) || null;

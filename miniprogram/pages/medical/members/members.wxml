@@ -3,6 +3,8 @@
   <view wx:if="{{members.length === 0}}" class="empty">暂无成员</view>
   <view wx:for="{{members}}" wx:key="id" class="member">
     <view class="info">
+      <image wx:if="{{item.avatarUrl}}" class="m-avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
+      <view wx:else class="m-avatar-ph">{{item.initial}}</view>
       <text class="name">{{item.nickname || ('用户' + item.id)}}</text>
       <text class="role {{item.role === 'admin' ? 'admin' : ''}}">{{item.roleLabel}}</text>
       <text wx:if="{{item.isMe}}" class="me">我</text>

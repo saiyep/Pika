@@ -1,8 +1,23 @@
 <view class="page">
-  <view class="filter-bar">
-    <text class="filter-label">查看</text>
-    <picker mode="selector" range="{{filterLabels}}" value="{{filterIndex}}" bindchange="onFilterPick">
-      <view class="filter-picker">{{filterLabels[filterIndex]}} ▾</view>
+  <view class="filters">
+    <picker class="f-item" mode="selector" range="{{subjectLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">
+      <view class="f-pick">{{subjectLabels[subjectIndex]}} ▾</view>
+    </picker>
+    <picker class="f-item" mode="selector" range="{{hospitalLabels}}" value="{{hospitalIndex}}" bindchange="onHospitalPick">
+      <view class="f-pick">{{hospitalLabels[hospitalIndex]}} ▾</view>
+    </picker>
+    <picker class="f-item" mode="selector" range="{{timeRanges}}" value="{{timeIndex}}" bindchange="onTimePick">
+      <view class="f-pick">{{timeRanges[timeIndex]}} ▾</view>
+    </picker>
+  </view>
+
+  <view wx:if="{{showCustom}}" class="custom-range">
+    <picker mode="date" value="{{customFrom}}" bindchange="onCustomFrom">
+      <view class="date-pick">{{customFrom || '起始日期'}}</view>
+    </picker>
+    <text class="date-sep">至</text>
+    <picker mode="date" value="{{customTo}}" bindchange="onCustomTo">
+      <view class="date-pick">{{customTo || '结束日期'}}</view>
     </picker>
   </view>
 

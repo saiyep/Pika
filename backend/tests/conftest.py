@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.db import Base
 # Import models so they register on Base.metadata.
 from app.core import models_base  # noqa: F401
+from app.core.user import models as user_models  # noqa: F401
 from app.modules.medical import models  # noqa: F401
 
 

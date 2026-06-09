@@ -20,6 +20,11 @@
       <text class="type">{{report.report_type_label || report.report_type}}</text>
       <text class="date">{{report.report_date || '日期未知'}} · {{report.hospital || '医院未知'}}</text>
     </view>
+    <view class="meta">
+      <text class="meta-line">被检查者：{{report.subject_nickname || '未指定'}}</text>
+      <text class="meta-line">报告时间：{{report.report_date || '未知'}}</text>
+      <text class="meta-line">上传时间：{{uploadedAt || '未知'}}</text>
+    </view>
 
     <view wx:if="{{report.status === 'failed'}}" class="failed-tip">
       识别失败，原图已保存
@@ -42,6 +47,13 @@
 
   <!-- 编辑态 -->
   <block wx:else>
+    <view class="edit-section">
+      <text class="field-label">被检查者</text>
+      <picker mode="selector" range="{{memberLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">
+        <view class="picker">{{memberLabels[subjectIndex] || '（未登录成员）'}}</view>
+      </picker>
+    </view>
+
     <view class="edit-section">
       <text class="field-label">医院</text>
       <picker mode="selector" range="{{hospitalOptions}}" value="{{hospitalIndex}}" bindchange="onHospitalPick">

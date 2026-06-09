@@ -8,11 +8,13 @@ services:
       - "8000:8000"
     volumes:
       - /volume1/Projects/Pika/data/uploads/medical:/app/data/uploads/medical  # 原图，单独挂载
+      - /volume1/Projects/Pika/data/avatars:/app/data/avatars                  # 头像，单独挂载
       - /volume1/Projects/Pika/data/db:/app/data/db                            # SQLite，单独挂载
     environment:                              # 凭据由 .env 注入（NAS 本地，不入 git）
       - TZ=${TZ}
       - DATA_DIR=/app/data
       - UPLOAD_DIR=/app/data/uploads/medical
+      - AVATAR_DIR=/app/data/avatars
       - DB_PATH=/app/data/db/pika.db
       - WX_APPID=${WX_APPID}
       - WX_SECRET=${WX_SECRET}

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.exceptions import PikaException
-from app.core.models_base import User
+from app.core.user.models import User
 
 
 def get_current_user(

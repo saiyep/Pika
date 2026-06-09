@@ -1,7 +1,10 @@
 .page { padding: 24rpx 32rpx; }
-.filter-bar { display: flex; align-items: center; gap: 16rpx; margin-bottom: 20rpx; }
-.filter-label { font-size: 26rpx; color: #888; }
-.filter-picker { background: #fff; border-radius: 8rpx; padding: 12rpx 24rpx; font-size: 26rpx; color: #07c160; }
+.filters { display: flex; gap: 12rpx; margin-bottom: 16rpx; }
+.f-item { flex: 1; min-width: 0; }
+.f-pick { background: #fff; border-radius: 8rpx; padding: 14rpx 12rpx; font-size: 24rpx; color: #07c160; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.custom-range { display: flex; align-items: center; gap: 16rpx; margin-bottom: 16rpx; }
+.date-pick { background: #fff; border-radius: 8rpx; padding: 14rpx 20rpx; font-size: 24rpx; color: #333; }
+.date-sep { font-size: 24rpx; color: #888; }
 .empty { text-align: center; color: #999; margin-top: 120rpx; font-size: 28rpx; }
 .item { position: relative; background: #fff; border-radius: 12rpx; padding: 24rpx; margin-bottom: 20rpx; }
 .row { display: flex; justify-content: space-between; align-items: center; }
