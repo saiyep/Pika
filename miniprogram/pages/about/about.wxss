@@ -1,0 +1,7 @@
+.page { padding: 48rpx 32rpx; }
+.logo { text-align: center; font-size: 64rpx; font-weight: 700; color: #07c160; }
+.version { display: block; text-align: center; margin-top: 12rpx; font-size: 26rpx; color: #888; }
+.tagline { display: block; text-align: center; margin-top: 8rpx; font-size: 24rpx; color: #aaa; }
+.section { background: #fff; border-radius: 16rpx; padding: 32rpx; margin-top: 32rpx; }
+.section-title { display: block; font-size: 28rpx; font-weight: 600; color: #333; margin-bottom: 16rpx; }
+.line { display: block; font-size: 26rpx; color: #666; line-height: 2; }

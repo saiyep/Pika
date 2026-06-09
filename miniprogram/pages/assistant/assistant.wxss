@@ -1,0 +1,4 @@
+.page { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; padding: 0 64rpx; }
+.icon { font-size: 120rpx; }
+.title { margin-top: 32rpx; font-size: 36rpx; font-weight: 600; color: #333; }
+.desc { margin-top: 20rpx; font-size: 26rpx; color: #999; text-align: center; line-height: 1.7; }

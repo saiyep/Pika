@@ -1,12 +1,26 @@
 {
   "pages": [
-    "pages/index/index",
+    "pages/services/services",
+    "pages/assistant/assistant",
+    "pages/mine/mine",
+    "pages/about/about",
+    "pages/medical/home/home",
     "pages/medical/upload/upload",
     "pages/medical/history/history",
     "pages/medical/report-detail/report-detail",
     "pages/medical/metric-trend/metric-trend",
     "pages/medical/members/members"
   ],
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#07c160",
+    "backgroundColor": "#ffffff",
+    "list": [
+      { "pagePath": "pages/services/services", "text": "服务" },
+      { "pagePath": "pages/assistant/assistant", "text": "AI 助手" },
+      { "pagePath": "pages/mine/mine", "text": "我" }
+    ]
+  },
   "window": {
     "navigationBarTitleText": "Pika 家庭服务",
     "navigationBarBackgroundColor": "#ffffff",

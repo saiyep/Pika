@@ -1,0 +1,24 @@
+.page { display: flex; flex-direction: column; height: 100vh; background: #f5f5f5; }
+
+.fav-section { padding: 24rpx 32rpx 16rpx; }
+.fav-title { display: block; font-size: 24rpx; color: #888; margin-bottom: 12rpx; }
+.fav-list { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.fav-item { display: flex; flex-direction: column; align-items: center; background: #fff; border-radius: 12rpx; padding: 20rpx 28rpx; }
+.fav-icon { font-size: 44rpx; }
+.fav-name { margin-top: 8rpx; font-size: 24rpx; color: #333; }
+
+.market { flex: 1; display: flex; min-height: 0; }
+.cat-col { width: 180rpx; background: #ececec; }
+.cat-item { padding: 32rpx 16rpx; text-align: center; font-size: 26rpx; color: #555; }
+.cat-item.active { background: #fff; color: #07c160; font-weight: 600; }
+
+.svc-col { flex: 1; padding: 16rpx 24rpx; }
+.svc-empty { text-align: center; color: #999; margin-top: 80rpx; font-size: 26rpx; }
+.svc-item { display: flex; align-items: center; justify-content: space-between; background: #fff; border-radius: 12rpx; padding: 24rpx; margin-bottom: 16rpx; }
+.svc-main { display: flex; align-items: center; flex: 1; }
+.svc-icon { font-size: 48rpx; margin-right: 20rpx; }
+.svc-text { display: flex; flex-direction: column; }
+.svc-name { font-size: 30rpx; color: #222; font-weight: 600; }
+.svc-cat { font-size: 22rpx; color: #999; margin-top: 4rpx; }
+.svc-fav { font-size: 40rpx; color: #ccc; padding: 0 8rpx; }
+.svc-fav.on { color: #fa8c16; }

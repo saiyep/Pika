@@ -1,13 +1,5 @@
 Page({
-  data: {
-    userNickname: '',
-  },
-  onShow() {
-    const user = getApp().globalData.user;
-    if (user) {
-      this.setData({ userNickname: user.nickname || '' });
-    }
-  },
+  data: {},
   goUpload() {
     wx.navigateTo({ url: '/pages/medical/upload/upload' });
   },
@@ -16,8 +8,5 @@ Page({
   },
   goTrend() {
     wx.navigateTo({ url: '/pages/medical/metric-trend/metric-trend' });
-  },
-  goMembers() {
-    wx.navigateTo({ url: '/pages/medical/members/members' });
   },
 });

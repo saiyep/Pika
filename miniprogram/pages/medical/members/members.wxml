@@ -2,7 +2,17 @@
   <view class="tip">家庭成员（登录后自动加入）。邀请功能将在公网上线后开放。</view>
   <view wx:if="{{members.length === 0}}" class="empty">暂无成员</view>
   <view wx:for="{{members}}" wx:key="id" class="member">
-    <text class="name">{{item.nickname || ('用户' + item.id)}}</text>
-    <text wx:if="{{item.id === myId}}" class="me">我</text>
+    <view class="info">
+      <text class="name">{{item.nickname || ('用户' + item.id)}}</text>
+      <text class="role {{item.role === 'admin' ? 'admin' : ''}}">{{item.roleLabel}}</text>
+      <text wx:if="{{item.isMe}}" class="me">我</text>
+    </view>
+    <view
+      wx:if="{{isAdmin && !item.isMe}}"
+      class="role-btn"
+      data-id="{{item.id}}"
+      data-role="{{item.role}}"
+      bindtap="onToggleRole"
+    >{{item.role === 'admin' ? '设为普通' : '设为管理员'}}</view>
   </view>
 </view>

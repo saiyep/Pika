@@ -15,10 +15,23 @@ class MemberItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     nickname: str | None = None
+    role: str | None = None
 
 
 class MemberListOut(BaseModel):
     items: list[MemberItem]
+
+
+class RoleUpdateIn(BaseModel):
+    role: str  # 'admin' | 'user'
+
+
+class FavoriteListOut(BaseModel):
+    service_keys: list[str]
+
+
+class FavoriteIn(BaseModel):
+    service_key: str
 
 
 class LoginIn(BaseModel):

@@ -19,6 +19,8 @@ from app.modules.medical.schemas import (
     DraftCommitIn,
     DraftMetric,
     DraftOut,
+    FavoriteIn,
+    FavoriteListOut,
     MemberItem,
     MemberListOut,
     MetricOut,
@@ -27,8 +29,10 @@ from app.modules.medical.schemas import (
     ReportListOut,
     ReportOut,
     ReportUpdateIn,
+    RoleUpdateIn,
     TrendOut,
     TrendPoint,
+    UserOut,
 )
 
 router = APIRouter(prefix="/api/medical", tags=["medical"])
@@ -53,6 +57,63 @@ def list_members(
     members = db.query(User).order_by(User.id.asc()).all()
     return ApiResponse.ok(
         MemberListOut(items=[MemberItem.model_validate(m) for m in members])
+    )
+
+
+@router.get("/whoami", response_model=ApiResponse[UserOut])
+def whoami(user: User = Depends(get_current_user)):
+    """Return the current logged-in user (incl. openid) — used to look up your
+    own openid for ADMIN_OPENID config."""
+    return ApiResponse.ok(UserOut.model_validate(user))
+
+
+@router.put("/members/{member_id}/role", response_model=ApiResponse[MemberItem])
+def set_member_role(
+    member_id: int,
+    body: RoleUpdateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    member = db.get(User, member_id)
+    if not member:
+        raise NotFoundError("member not found")
+    member.role = body.role
+    db.commit()
+    db.refresh(member)
+    return ApiResponse.ok(MemberItem.model_validate(member))
+
+
+@router.get("/favorites", response_model=ApiResponse[FavoriteListOut])
+def list_favorites(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return ApiResponse.ok(
+        FavoriteListOut(service_keys=service.list_favorites(db, user_id=user.id))
+    )
+
+
+@router.post("/favorites", response_model=ApiResponse[FavoriteListOut])
+def add_favorite(
+    body: FavoriteIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    service.add_favorite(db, user_id=user.id, service_key=body.service_key)
+    return ApiResponse.ok(
+        FavoriteListOut(service_keys=service.list_favorites(db, user_id=user.id))
+    )
+
+
+@router.delete("/favorites/{service_key}", response_model=ApiResponse[FavoriteListOut])
+def remove_favorite(
+    service_key: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    service.remove_favorite(db, user_id=user.id, service_key=service_key)
+    return ApiResponse.ok(
+        FavoriteListOut(service_keys=service.list_favorites(db, user_id=user.id))
     )
 
 

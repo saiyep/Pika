@@ -1,0 +1,5 @@
+<view class="page">
+  <view class="icon">🤖</view>
+  <text class="title">AI 助手开发中</text>
+  <text class="desc">将支持用自然语言查询家庭健康数据，例如"妈妈最近的血糖怎么样""上个月谁做了检查"。</text>
+</view>

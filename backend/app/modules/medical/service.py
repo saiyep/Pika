@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core import storage
 from app.core.exceptions import DuplicateReportError
 from app.modules.medical import vision
-from app.modules.medical.models import MedicalReport, MedicalReportMetric
+from app.modules.medical.models import MedicalReport, MedicalReportMetric, UserFavoriteService
 
 logger = logging.getLogger(__name__)
 
@@ -314,3 +314,27 @@ def update_report(
     db.commit()
     db.refresh(report)
     return report
+
+
+def list_favorites(db: Session, *, user_id: int) -> list[str]:
+    rows = db.query(UserFavoriteService.service_key).filter_by(user_id=user_id).all()
+    return [r[0] for r in rows]
+
+
+def add_favorite(db: Session, *, user_id: int, service_key: str) -> None:
+    exists = (
+        db.query(UserFavoriteService.id)
+        .filter_by(user_id=user_id, service_key=service_key)
+        .first()
+    )
+    if exists:
+        return
+    db.add(UserFavoriteService(user_id=user_id, service_key=service_key))
+    db.commit()
+
+
+def remove_favorite(db: Session, *, user_id: int, service_key: str) -> None:
+    db.query(UserFavoriteService).filter_by(
+        user_id=user_id, service_key=service_key
+    ).delete()
+    db.commit()

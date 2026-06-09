@@ -1,0 +1,12 @@
+.page { padding: 32rpx; }
+.profile { display: flex; align-items: center; background: #fff; border-radius: 16rpx; padding: 40rpx 32rpx; margin-bottom: 32rpx; }
+.avatar { width: 96rpx; height: 96rpx; border-radius: 48rpx; background: #07c160; color: #fff; font-size: 44rpx; display: flex; align-items: center; justify-content: center; margin-right: 24rpx; }
+.profile-text { display: flex; flex-direction: column; }
+.name { font-size: 36rpx; font-weight: 600; color: #222; }
+.role { margin-top: 10rpx; font-size: 22rpx; color: #888; background: #f0f0f0; border-radius: 6rpx; padding: 4rpx 16rpx; align-self: flex-start; }
+.role.admin { color: #07c160; background: #e7f9ef; }
+.menu { background: #fff; border-radius: 16rpx; overflow: hidden; }
+.menu-item { display: flex; align-items: center; justify-content: space-between; padding: 32rpx; border-bottom: 1rpx solid #f0f0f0; }
+.menu-item:last-child { border-bottom: none; }
+.menu-label { font-size: 30rpx; color: #333; }
+.menu-arrow { font-size: 36rpx; color: #ccc; }

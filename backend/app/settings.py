@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     wx_appid: str = ""
     wx_secret: str = ""
 
+    # The family admin (this openid is always role=admin on login).
+    admin_openid: str = ""
+
     # Azure OpenAI (gpt-5.4-mini, vision)
     azure_openai_endpoint: str = ""
     azure_openai_api_key: str = ""
