@@ -2,26 +2,27 @@
 
 ## 现状
 
-**就医服务 PoC v0.1 验证通过；v0.2 工程底座已实现（待提交+部署）。**
+**就医服务模块已相当完整，平台化框架（TabBar+服务市场+成员/角色）已落地，全部部署到 NAS 并验证。**
 
-PoC 主链路（多图上传→草稿→人工修正→提交→历史/详情/趋势，含 hospital）模拟器与真机均跑通，Azure 解析经人工核对正确，后端部署在绿联 NAS（`http://192.168.1.200:8000/health` 通）。
+已实现并验证的能力（详见 `memory` 与代码）：
+- **就医**：多图上传→草稿→人工修正→提交→历史/详情/趋势（含 hospital）；删除、重复去重、失败重解析、防误传、医院预设、详情页可编辑（含改被检查者）。
+- **成员档案**：报告按被检查人（subject=登录用户）归属；历史/趋势按人筛选；历史多 filter（被检查者/医院/时间范围）。
+- **平台化**：底部 TabBar（服务市场/AI助手占位/我）；成员管理 + 角色（ADMIN_OPENID→admin）；微信昵称头像（"我"页设置，存 NAS data/avatars）。
+- **工程底座**：Alembic 迁移、pytest（50+ 测试）、日志时间戳、密钥不落日志、`/health` 带 version+db_revision。
 
-v0.2 底座五项已落地并通过 40 个 pytest：
-- **C1 Alembic 迁移**：移除 `create_all`，env.py 复用 `settings.db_path`；两条迁移（initial → content_hash）。
-- **C2 pytest 骨架**：`backend/tests/`，覆盖 vision 后处理 + draft/commit 流程，Azure mock。
-- **B1 删除报告**：`DELETE /reports/{id}`（删库删图）+ 历史页删除按钮。
-- **B2 去重**：`content_hash` 列，draft 阶段按图片内容全局判重。
-- **C3 失败重解析**：`POST /reports/{id}/reparse` + 详情页重解析按钮。
+后端 `core/`（平台，`/api/user`）+ `modules/medical/`（就医，`/api/medical`）分层；用户相关在 `core/user/` 子模块。
 
-## 下一步
+## 下一步（按优先级）
 
-1. **提交并部署**：commit 这批改动；release 后端到 NAS。**首次部署需对已有 `pika.db` 跑 `alembic stamp head` 再 `alembic upgrade head`**（见 CLAUDE.md）。
-2. **模拟器验证前端**：删除/去重提示/重解析三个交互需部署后在微信开发者工具实测（本环境无法验 UI）。
-3. （待排定 v0.3）多图子表化、草稿持久化、成员管理与共享、公网 HTTPS。
+1. **公网 HTTPS + 体验版** ⭐ 最高优先级：成员区分/按人筛选/角色/邀请等多用户功能全做好了，但被「只有 admin 一个账号能登录」卡着。打通公网、发体验版让家人登录，即激活全部已做功能。涉及域名+内网穿透+证书+微信后台合法域名；有安全考量，先理清方案再动手。
+2. **二维码邀请加入**（依赖 1）。
+3. **权限控制**（依赖多用户）：普通用户不能删/改别人报告、改别人角色。
+4. **趋势图升级**、**AI 助手**（中间 tab，自然语言查数据，见 memory）、更多报告类型适配。
 
 ## 关键约定（易踩坑）
 
-- DB 由 Alembic 管理；改 models 后 `alembic revision --autogenerate -m "..."` 生成迁移，启动前 `alembic upgrade head`。
-- B2 去重按图片内容 hash 全局唯一；upload.js 当前每图一请求，故多图按单图判重。
-- 真实凭据只在 NAS 的 `.env`，不入 git。
-- 架构/命令见 `CLAUDE.md`；范围见 `IMPLEMENTATION_PLAN.md`。
+- DB 由 Alembic 管理；改 models 后 `alembic revision --autogenerate`。NAS 部署 entrypoint 自动 upgrade。
+- 改 backend 代码须 **rebuild**（重启不够）；改挂载须同步 NAS 的 `docker-compose.yaml`。
+- 流程：先 release→模拟器验证→再 commit（不提交未验证代码）。
+- ADMIN_OPENID 等真实凭据只在 NAS `.env`，不入 git。
+- 架构/命令见 `CLAUDE.md`。

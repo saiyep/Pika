@@ -28,16 +28,12 @@
 4. 历史/详情/趋势显示 hospital
 5. 真机局域网连续成功 3 次
 
-## v0.2 工程底座（已完成）
+## 已完成（PoC v0.1 + v0.2 底座 + 平台化）
 
-PoC v0.1 验证通过后，本期打牢工程底座，让 schema 变更与重构安全可控。五项均已实现并通过 pytest：
+PoC 主链路、v0.2 工程底座（Alembic/pytest/删除/去重/重解析）均已实现验证。其后又落地：成员档案（报告按被检查人归属+筛选）、底部 TabBar+服务市场、成员角色（ADMIN_OPENID）、微信昵称头像、历史多 filter、`core/user/` 平台子模块重构。全部部署到 NAS 并经用户验证。当前能力清单见 `PROJECT_STATUS.md` 与 memory。
 
-1. **C1 Alembic 迁移** — 替换 `create_all`，env.py 复用 `settings.db_path`。
-2. **C2 pytest 测试骨架** — `backend/tests/`，vision 后处理 + draft/commit 流程（Azure mock）。
-3. **B1 删除报告** — `DELETE /reports/{id}`（删库删图）+ 历史页删除。
-4. **B2 重复上传去重** — `content_hash` 列，draft 阶段按图片内容全局判重。
-5. **C3 失败重解析** — `POST /reports/{id}/reparse`，对 failed 报告用原图重调 Azure。
+## 下一步（按优先级）
 
-## 后续（v0.3+，待排定）
-
-多图子表化、草稿持久化、成员管理与共享、公网 HTTPS。
+1. **公网 HTTPS + 体验版**（最高）：多用户功能已就绪，被「仅 admin 能登录」卡着；公网就绪后家人登录即激活。涉及域名/内网穿透/证书/微信后台。
+2. 二维码邀请（依赖 1）、权限控制（依赖多用户）。
+3. 趋势图升级、AI 助手（中间 tab）、更多报告类型适配。

@@ -27,8 +27,8 @@ Not in current scope:
 Mini Program (native WeChat) -> FastAPI backend -> SQLite + NAS file storage -> Azure GPT-4.5-mini (vision)
 
 Backend layering:
-- `backend/app/core/`: platform-level shared capabilities (db/session, user resolution, storage, base schemas/exceptions)
-- `backend/app/modules/medical/`: medical module only (models/schemas/service/router/vision)
+- `backend/app/core/`: platform-level shared capabilities (db/session, storage, base schemas/exceptions). `core/user/` holds the User model + user/member/role/favorites/profile/avatar (router at `/api/user`).
+- `backend/app/modules/medical/`: medical module only (models/schemas/service/router/vision), router at `/api/medical`.
 
 Rule: `core/` must not depend on `modules/`.
 
@@ -36,22 +36,15 @@ Rule: `core/` must not depend on `modules/`.
 
 - Unified response wrapper: `{"code": 0, "msg": "ok", "data": ...}`
 - Auth (POC): `X-Pika-Token` header, token == openid
-- Table naming: module business tables must use `medical_` prefix
-
-Current key medical APIs:
-- `POST /api/medical/report-drafts`
-- `POST /api/medical/report-drafts/{draft_id}/commit`
-- `POST /api/medical/reports` (compat path)
-- `GET /api/medical/reports`
-- `GET /api/medical/reports/{id}`
-- `GET /api/medical/reports/{id}/image`
-- `GET /api/medical/metrics/catalog`
-- `GET /api/medical/metrics/trend`
+- API namespacing by layer: platform/user endpoints under `/api/user` (in `core/user/`), medical business under `/api/medical` (in `modules/medical/`), auth under `/api/auth`.
+- Table naming: platform tables use generic names (`users`, `user_favorite`); module business tables use a module prefix (`medical_*`).
+- Exact routes/fields are derivable from the routers — don't maintain a list here.
 
 ## Storage and deployment constraints
 
-Persistent mounts (required):
+Persistent mounts (required, each a separate volume — `data/` itself is NOT mounted):
 - Raw images: `/volume1/Projects/Pika/data/uploads/medical` -> `/app/data/uploads/medical`
+- Avatars: `/volume1/Projects/Pika/data/avatars` -> `/app/data/avatars`
 - SQLite DB: `/volume1/Projects/Pika/data/db` -> `/app/data/db`
 
 Important UGREEN Docker UI constraint:
@@ -68,6 +61,7 @@ Inject runtime env vars in NAS compose environment:
 - `AZURE_OPENAI_DEPLOYMENT`
 - `WX_APPID`
 - `WX_SECRET`
+- `ADMIN_OPENID` (this openid is always role=admin on login)
 
 ## Local development commands
 
