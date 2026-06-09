@@ -19,6 +19,8 @@ from app.modules.medical.schemas import (
     DraftCommitIn,
     DraftMetric,
     DraftOut,
+    MemberItem,
+    MemberListOut,
     MetricOut,
     ReportDetailOut,
     ReportListItem,
@@ -30,6 +32,28 @@ from app.modules.medical.schemas import (
 )
 
 router = APIRouter(prefix="/api/medical", tags=["medical"])
+
+
+def _detail_out(db: Session, report: MedicalReport) -> ReportDetailOut:
+    out = ReportOut.model_validate(report)
+    if report.subject_id is not None:
+        subj = db.get(User, report.subject_id)
+        out.subject_nickname = subj.nickname if subj else None
+    return ReportDetailOut(
+        report=out,
+        metrics=[MetricOut.model_validate(m) for m in report.metrics],
+    )
+
+
+@router.get("/members", response_model=ApiResponse[MemberListOut])
+def list_members(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    members = db.query(User).order_by(User.id.asc()).all()
+    return ApiResponse.ok(
+        MemberListOut(items=[MemberItem.model_validate(m) for m in members])
+    )
 
 
 @router.post("/reports", response_model=ApiResponse[ReportDetailOut])
@@ -52,12 +76,7 @@ async def upload_report(
         report_date_override=report_date,
         hospital_override=hospital,
     )
-    return ApiResponse.ok(
-        ReportDetailOut(
-            report=ReportOut.model_validate(report),
-            metrics=[MetricOut.model_validate(m) for m in report.metrics],
-        )
-    )
+    return ApiResponse.ok(_detail_out(db, report))
 
 
 @router.post("/report-drafts", response_model=ApiResponse[DraftOut])
@@ -114,12 +133,7 @@ def commit_report_draft(
     except ValueError as e:
         raise NotFoundError(str(e))
 
-    return ApiResponse.ok(
-        ReportDetailOut(
-            report=ReportOut.model_validate(report),
-            metrics=[MetricOut.model_validate(m) for m in report.metrics],
-        )
-    )
+    return ApiResponse.ok(_detail_out(db, report))
 
 
 @router.get("/reports", response_model=ApiResponse[ReportListOut])
@@ -158,6 +172,8 @@ def list_reports(
                 report_type_label=r.report_type_label,
                 report_date=r.report_date,
                 hospital=r.hospital,
+                subject_id=r.subject_id,
+                subject_nickname=nickname_by_id.get(r.subject_id),
                 uploader_nickname=nickname_by_id.get(r.uploader_id),
                 abnormal_count=abnormal,
                 status=r.status,
@@ -176,12 +192,7 @@ def get_report(
     report = db.get(MedicalReport, report_id)
     if not report:
         raise NotFoundError("report not found")
-    return ApiResponse.ok(
-        ReportDetailOut(
-            report=ReportOut.model_validate(report),
-            metrics=[MetricOut.model_validate(m) for m in report.metrics],
-        )
-    )
+    return ApiResponse.ok(_detail_out(db, report))
 
 
 @router.put("/reports/{report_id}", response_model=ApiResponse[ReportDetailOut])
@@ -202,12 +213,7 @@ def update_report(
     )
     if report is None:
         raise NotFoundError("report not found")
-    return ApiResponse.ok(
-        ReportDetailOut(
-            report=ReportOut.model_validate(report),
-            metrics=[MetricOut.model_validate(m) for m in report.metrics],
-        )
-    )
+    return ApiResponse.ok(_detail_out(db, report))
 
 
 @router.delete("/reports/{report_id}", response_model=ApiResponse[None])
@@ -234,12 +240,7 @@ def reparse_report(
         raise VisionParseError("重新解析失败，请稍后再试")
     if report is None:
         raise NotFoundError("report not found")
-    return ApiResponse.ok(
-        ReportDetailOut(
-            report=ReportOut.model_validate(report),
-            metrics=[MetricOut.model_validate(m) for m in report.metrics],
-        )
-    )
+    return ApiResponse.ok(_detail_out(db, report))
 
 
 @router.get("/reports/{report_id}/image")

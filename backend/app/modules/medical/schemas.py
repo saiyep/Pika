@@ -11,6 +11,16 @@ class UserOut(BaseModel):
     role: str | None = None
 
 
+class MemberItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    nickname: str | None = None
+
+
+class MemberListOut(BaseModel):
+    items: list[MemberItem]
+
+
 class LoginIn(BaseModel):
     code: str
     nickname: str | None = None
@@ -40,6 +50,7 @@ class ReportOut(BaseModel):
     id: int
     uploader_id: int
     subject_id: int | None = None
+    subject_nickname: str | None = None
     report_type: str
     report_type_label: str | None = None
     report_date: date | None = None
@@ -59,6 +70,8 @@ class ReportListItem(BaseModel):
     report_type_label: str | None = None
     report_date: date | None = None
     hospital: str | None = None
+    subject_id: int | None = None
+    subject_nickname: str | None = None
     uploader_nickname: str | None = None
     abnormal_count: int = 0
     status: str

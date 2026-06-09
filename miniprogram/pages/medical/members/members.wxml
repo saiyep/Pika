@@ -1,0 +1,8 @@
+<view class="page">
+  <view class="tip">家庭成员（登录后自动加入）。邀请功能将在公网上线后开放。</view>
+  <view wx:if="{{members.length === 0}}" class="empty">暂无成员</view>
+  <view wx:for="{{members}}" wx:key="id" class="member">
+    <text class="name">{{item.nickname || ('用户' + item.id)}}</text>
+    <text wx:if="{{item.id === myId}}" class="me">我</text>
+  </view>
+</view>

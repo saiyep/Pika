@@ -1,4 +1,11 @@
 <view class="page">
+  <view class="filter-bar">
+    <text class="filter-label">查看</text>
+    <picker mode="selector" range="{{filterLabels}}" value="{{filterIndex}}" bindchange="onFilterPick">
+      <view class="filter-picker">{{filterLabels[filterIndex]}} ▾</view>
+    </picker>
+  </view>
+
   <view wx:if="{{items.length === 0}}" class="empty">暂无检查记录</view>
   <view wx:for="{{items}}" wx:key="id" class="item" bindtap="goDetail" data-id="{{item.id}}">
     <view class="row">
@@ -6,7 +13,7 @@
       <text class="date">{{item.report_date || '日期未知'}}</text>
     </view>
     <view class="row sub">
-      <text class="uploader">上传：{{item.uploader_nickname || '—'}} · 医院：{{item.hospital || '—'}}</text>
+      <text class="uploader">{{item.subject_nickname || '未指定'}} · 医院：{{item.hospital || '—'}}</text>
       <text wx:if="{{item.abnormal_count > 0}}" class="abnormal">{{item.abnormal_count}} 项异常</text>
       <text wx:elif="{{item.status === 'failed'}}" class="failed">识别失败</text>
       <text wx:else class="normal">正常</text>

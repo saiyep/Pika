@@ -31,6 +31,41 @@ Page({
     hospitalIndex: OTHER_INDEX,
     hospitalCustom: '',
     metrics: [],
+    // 被检查人（报告属于谁）
+    members: [],
+    memberLabels: [],
+    subjectIndex: 0,
+  },
+
+  onShow() {
+    this.loadMembers();
+  },
+
+  loadMembers() {
+    request({ url: '/api/medical/members' })
+      .then((data) => {
+        const members = data.items || [];
+        const myId = (getApp().globalData.user && getApp().globalData.user.id) || null;
+        let idx = members.findIndex((m) => m.id === myId);
+        if (idx < 0) idx = 0;
+        this.setData({
+          members,
+          memberLabels: members.map((m) => m.nickname || ('用户' + m.id)),
+          subjectIndex: idx,
+        });
+      })
+      .catch(() => {
+        // 成员拉取失败不阻断上传，subject 留空即可。
+      });
+  },
+
+  onSubjectPick(e) {
+    this.setData({ subjectIndex: Number(e.detail.value) });
+  },
+
+  subjectId() {
+    const m = this.data.members[this.data.subjectIndex];
+    return m ? m.id : '';
   },
 
   // 当前生效的医院名：选了预设项用预设名，选"其他"用自定义输入。
@@ -106,6 +141,7 @@ Page({
           timeout: 60000,
           formData: {
             hospital: this.resolvedHospital(),
+            subject_id: this.subjectId(),
           },
           header: { 'X-Pika-Token': token },
           success: (res) => {

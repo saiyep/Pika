@@ -6,10 +6,51 @@ Page({
     catalogLabels: [],
     selectedIndex: 0,
     trend: null,
+    // 被检查人 filter
+    members: [],
+    filterLabels: ['全家'],
+    filterIndex: 0,
   },
 
   onLoad() {
-    request({ url: '/api/medical/metrics/catalog' })
+    this.loadMembers();
+  },
+
+  loadMembers() {
+    request({ url: '/api/medical/members' })
+      .then((data) => {
+        const members = data.items || [];
+        const myId = (getApp().globalData.user && getApp().globalData.user.id) || null;
+        let idx = members.findIndex((m) => m.id === myId);
+        idx = idx < 0 ? 0 : idx + 1;
+        this.setData(
+          {
+            members,
+            filterLabels: ['全家', ...members.map((m) => m.nickname || ('用户' + m.id))],
+            filterIndex: idx,
+          },
+          () => this.loadCatalog()
+        );
+      })
+      .catch(() => {
+        this.loadCatalog();
+      });
+  },
+
+  subjectQuery() {
+    if (this.data.filterIndex > 0) {
+      const m = this.data.members[this.data.filterIndex - 1];
+      if (m) return '&subject_id=' + m.id;
+    }
+    return '';
+  },
+
+  onFilterPick(e) {
+    this.setData({ filterIndex: Number(e.detail.value), selectedIndex: 0 }, () => this.loadCatalog());
+  },
+
+  loadCatalog() {
+    request({ url: '/api/medical/metrics/catalog?_=1' + this.subjectQuery() })
       .then((data) => {
         const catalog = data.items || [];
         this.setData({
@@ -18,6 +59,9 @@ Page({
         });
         if (catalog.length) {
           this.loadTrend(catalog[0]);
+        } else {
+          this.setData({ trend: null });
+          wx.nextTick(() => this.draw({ points: [] }));
         }
       })
       .catch(() => {
@@ -35,7 +79,7 @@ Page({
     const q = item.item_code
       ? 'item_code=' + encodeURIComponent(item.item_code)
       : 'item_name=' + encodeURIComponent(item.item_name);
-    request({ url: '/api/medical/metrics/trend?' + q })
+    request({ url: '/api/medical/metrics/trend?' + q + this.subjectQuery() })
       .then((trend) => {
         this.setData({ trend });
         wx.nextTick(() => this.draw(trend));

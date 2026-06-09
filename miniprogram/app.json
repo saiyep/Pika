@@ -4,7 +4,8 @@
     "pages/medical/upload/upload",
     "pages/medical/history/history",
     "pages/medical/report-detail/report-detail",
-    "pages/medical/metric-trend/metric-trend"
+    "pages/medical/metric-trend/metric-trend",
+    "pages/medical/members/members"
   ],
   "window": {
     "navigationBarTitleText": "Pika 家庭服务",

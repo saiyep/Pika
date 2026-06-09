@@ -1,4 +1,11 @@
 <view class="page">
+  <view class="section" wx:if="{{step === 'pick'}}">
+    <text class="section-title">被检查人</text>
+    <picker mode="selector" range="{{memberLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">
+      <view class="picker">{{memberLabels[subjectIndex] || '（未登录成员）'}}</view>
+    </picker>
+  </view>
+
   <view class="section">
     <text class="section-title">医院</text>
     <picker mode="selector" range="{{hospitalOptions}}" value="{{hospitalIndex}}" bindchange="onHospitalPick">

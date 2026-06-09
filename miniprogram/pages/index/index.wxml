@@ -18,4 +18,9 @@
     <text class="card-title">指标趋势</text>
     <text class="card-desc">看某项指标随时间变化</text>
   </view>
+
+  <view class="module-card" bindtap="goMembers">
+    <text class="card-title">家庭成员</text>
+    <text class="card-desc">查看家庭成员档案</text>
+  </view>
 </view>

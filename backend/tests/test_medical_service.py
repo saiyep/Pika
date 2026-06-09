@@ -322,5 +322,47 @@ def test_update_missing_report_returns_none(db_session):
     ) is None
 
 
+def test_subject_id_flows_draft_to_committed_report(db_session, user, tmp_upload, monkeypatch):
+    # A second family member who is the subject of the report.
+    mom = User(openid="mom-openid", nickname="妈妈")
+    db_session.add(mom)
+    db_session.commit()
+    db_session.refresh(mom)
+
+    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    draft = service.create_draft_from_images(
+        db_session, uploader_id=user.id, subject_id=mom.id,
+        files=[(b"\x89PNG\r\n\x1a\n subj", "a.png", "image/png")], hospital_override="X",
+    )
+    assert draft["subject_id"] == mom.id
+
+    report = _commit(db_session, draft)
+    # Report belongs to mom (subject), uploaded by user.
+    assert report.subject_id == mom.id
+    assert report.uploader_id == user.id
+
+
+def test_list_filter_by_subject(db_session, user, tmp_upload, monkeypatch):
+    mom = User(openid="mom2", nickname="妈妈")
+    db_session.add(mom)
+    db_session.commit()
+    db_session.refresh(mom)
+
+    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    # one report for user, one for mom
+    for sid, img in [(user.id, b"\x89PNG\r\n\x1a\n me"), (mom.id, b"\x89PNG\r\n\x1a\n mom")]:
+        d = service.create_draft_from_images(
+            db_session, uploader_id=user.id, subject_id=sid,
+            files=[(img, "a.png", "image/png")], hospital_override="X",
+        )
+        _commit(db_session, d)
+
+    from app.modules.medical.models import MedicalReport
+    mom_reports = db_session.query(MedicalReport).filter_by(subject_id=mom.id).all()
+    assert len(mom_reports) == 1
+    assert mom_reports[0].subject_id == mom.id
+
+
+
 
 
