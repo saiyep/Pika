@@ -23,5 +23,6 @@ def code_to_openid(code: str) -> str:
 
     openid = data.get("openid")
     if not openid:
-        raise WeChatError(f"wechat returned no openid: {data}")
+        # Don't echo `data` — it may carry session_key / errcode details.
+        raise WeChatError("wechat returned no openid")
     return openid
