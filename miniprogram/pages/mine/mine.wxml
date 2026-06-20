@@ -1,39 +1,49 @@
 <view class="page">
-  <!-- 只读态 -->
-  <view wx:if="{{!editing}}" class="profile" bindtap="startEdit">
-    <image wx:if="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" />
-    <view wx:else class="avatar">{{initial}}</view>    <view class="profile-text">
-      <text class="name">{{nickname}}</text>
-      <text class="role {{isAdmin ? 'admin' : ''}}">{{roleLabel}}</text>
-    </view>
-    <text class="edit-hint">编辑 ›</text>
+  <view wx:if="{{!loggedIn}}" class="login-card">
+    <view class="avatar">?</view>
+    <text class="login-title">未登录</text>
+    <text class="login-desc">请先微信登录后使用服务</text>
+    <button class="login-btn" loading="{{loggingIn}}" bindtap="doWechatLogin">微信登录</button>
   </view>
 
-  <!-- 编辑态 -->
-  <view wx:else class="profile-edit">
-    <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
-      <image wx:if="{{pendingAvatar}}" class="avatar-img" src="{{pendingAvatar}}" mode="aspectFill" />
-      <image wx:elif="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" />
-      <view wx:else class="avatar">+</view>
-    </button>
-    <text class="avatar-tip">点击选择微信头像</text>
-
-    <view class="nickname-row">
-      <text class="nk-label">昵称</text>
-      <input
-        class="nk-input"
-        type="nickname"
-        placeholder="点击填写微信昵称"
-        value="{{editNickname}}"
-        bindinput="onNicknameInput"
-      />
+  <block wx:elif="{{editing}}">
+    <view class="edit-card">
+      <view class="edit-row avatar-row">
+        <text class="row-label">头像</text>
+        <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+          <image wx:if="{{pendingAvatar}}" class="avatar-img" src="{{pendingAvatar}}" mode="aspectFill" />
+          <image wx:elif="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" />
+          <view wx:else class="avatar">+</view>
+        </button>
+      </view>
+      <view class="edit-row">
+        <text class="row-label">昵称</text>
+        <input
+          class="nk-input"
+          type="nickname"
+          placeholder="请输入微信昵称"
+          value="{{editNickname}}"
+          bindinput="onNicknameInput"
+        />
+      </view>
     </view>
-
     <view class="edit-actions">
       <button class="act ghost" bindtap="cancelEdit">取消</button>
-      <button class="act primary" bindtap="saveProfile">保存</button>
+      <button class="act primary" bindtap="saveProfile">保存资料</button>
     </view>
-  </view>
+  </block>
+
+  <block wx:else>
+    <view class="profile">
+      <image wx:if="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" />
+      <view wx:else class="avatar">{{initial}}</view>
+      <view class="profile-text">
+        <text class="name">{{nickname}}</text>
+        <text class="role {{isAdmin ? 'admin' : ''}}">{{roleLabel}}</text>
+      </view>
+      <text class="edit-hint" bindtap="startEdit">编辑 ›</text>
+    </view>
+  </block>
 
   <view class="menu">
     <view class="menu-item" bindtap="goMembers">
@@ -42,6 +52,10 @@
     </view>
     <view class="menu-item" bindtap="goAbout">
       <text class="menu-label">版本说明</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view wx:if="{{loggedIn}}" class="menu-item logout" bindtap="logout">
+      <text class="menu-label danger">退出登录</text>
       <text class="menu-arrow">›</text>
     </view>
   </view>

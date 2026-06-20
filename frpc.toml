@@ -7,9 +7,11 @@ auth.token = "{{ .Envs.FRP_TOKEN }}"
 # 隧道流量 TLS 加密（防中间人监听）
 transport.tls.enable = true
 
+# Pika 后端（http 类型，按域名路由）
 [[proxies]]
 name = "pika"
 type = "http"
 localIP = "pika-backend"
 localPort = 8000
 customDomains = ["{{ .Envs.PUBLIC_DOMAIN }}"]
+

@@ -1,43 +1,50 @@
 <view class="page">
-  <!-- 我的关注 -->
-  <view wx:if="{{favoriteServices.length}}" class="fav-section">
-    <text class="fav-title">我的关注</text>
-    <view class="fav-list">
-      <view wx:for="{{favoriteServices}}" wx:key="key" class="fav-item" data-path="{{item.path}}" bindtap="openService">
-        <text class="fav-icon">{{item.icon}}</text>
-        <text class="fav-name">{{item.name}}</text>
+  <view wx:if="{{!loggedIn}}" class="locked">
+    <text class="locked-title">请先登录</text>
+    <text class="locked-desc">登录后可查看并使用服务</text>
+  </view>
+
+  <block wx:else>
+    <!-- 我的关注 -->
+    <view wx:if="{{favoriteServices.length}}" class="fav-section">
+      <text class="fav-title">我的关注</text>
+      <view class="fav-list">
+        <view wx:for="{{favoriteServices}}" wx:key="key" class="fav-item" data-path="{{item.path}}" bindtap="openService">
+          <text class="fav-icon">{{item.icon}}</text>
+          <text class="fav-name">{{item.name}}</text>
+        </view>
       </view>
     </view>
-  </view>
 
-  <!-- 分类 + 服务列表 -->
-  <view class="market">
-    <scroll-view class="cat-col" scroll-y>
-      <view
-        wx:for="{{categories}}"
-        wx:key="*this"
-        class="cat-item {{index === categoryIndex ? 'active' : ''}}"
-        data-idx="{{index}}"
-        bindtap="onCategoryPick"
-      >{{item}}</view>
-    </scroll-view>
+    <!-- 分类 + 服务列表 -->
+    <view class="market">
+      <scroll-view class="cat-col" scroll-y>
+        <view
+          wx:for="{{categories}}"
+          wx:key="*this"
+          class="cat-item {{index === categoryIndex ? 'active' : ''}}"
+          data-idx="{{index}}"
+          bindtap="onCategoryPick"
+        >{{item}}</view>
+      </scroll-view>
 
-    <scroll-view class="svc-col" scroll-y>
-      <view wx:if="{{visibleServices.length === 0}}" class="svc-empty">该分类暂无服务</view>
-      <view wx:for="{{visibleServices}}" wx:key="key" class="svc-item">
-        <view class="svc-main" data-path="{{item.path}}" bindtap="openService">
-          <text class="svc-icon">{{item.icon}}</text>
-          <view class="svc-text">
-            <text class="svc-name">{{item.name}}</text>
-            <text class="svc-cat">{{item.category}}</text>
+      <scroll-view class="svc-col" scroll-y>
+        <view wx:if="{{visibleServices.length === 0}}" class="svc-empty">该分类暂无服务</view>
+        <view wx:for="{{visibleServices}}" wx:key="key" class="svc-item">
+          <view class="svc-main" data-path="{{item.path}}" bindtap="openService">
+            <text class="svc-icon">{{item.icon}}</text>
+            <view class="svc-text">
+              <text class="svc-name">{{item.name}}</text>
+              <text class="svc-cat">{{item.category}}</text>
+            </view>
           </view>
+          <text
+            class="svc-fav {{item.isFav ? 'on' : ''}}"
+            data-key="{{item.key}}"
+            catchtap="toggleFavorite"
+          >{{item.isFav ? '★' : '☆'}}</text>
         </view>
-        <text
-          class="svc-fav {{item.isFav ? 'on' : ''}}"
-          data-key="{{item.key}}"
-          catchtap="toggleFavorite"
-        >{{item.isFav ? '★' : '☆'}}</text>
-      </view>
-    </scroll-view>
-  </view>
+      </scroll-view>
+    </view>
+  </block>
 </view>

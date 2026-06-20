@@ -1,16 +1,20 @@
-// 默认连局域网 NAS（开发者工具需勾「不校验合法域名」）。
-// 要连公网 HTTPS：复制 config.local.example.js 为 config.local.js 并填域名，
-// config.local.js 已被 gitignore，不会进仓库。
-let BASE_URL = 'http://192.168.1.200:8000';
+// 默认连公网 HTTPS（体验版/线上）。
+// 仅开发环境允许本地 config.local.js 覆盖到局域网地址。
+let BASE_URL = 'https://pika-n8n.eastasia.cloudapp.azure.com';
 
+let envVersion = 'release';
 try {
-  // 本地覆盖（存在则用它，不存在不报错）
-  const local = require('./config.local');
-  if (local && local.BASE_URL) {
-    BASE_URL = local.BASE_URL;
-  }
-} catch (_e) {
-  // 没有 config.local.js，用默认
+  const account = wx.getAccountInfoSync();
+  envVersion = (account && account.miniProgram && account.miniProgram.envVersion) || 'release';
+} catch (_e) {}
+
+if (envVersion === 'develop') {
+  try {
+    const local = require('./config.local');
+    if (local && local.BASE_URL) {
+      BASE_URL = local.BASE_URL;
+    }
+  } catch (_e) {}
 }
 
 module.exports = {

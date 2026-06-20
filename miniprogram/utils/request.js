@@ -1,7 +1,8 @@
 const { BASE_URL } = require('../config');
+const { clearSession, getToken } = require('./auth');
 
 function request({ url, method = 'GET', data = {}, header = {} }) {
-  const token = getApp().globalData.token || wx.getStorageSync('token') || '';
+  const token = getToken();
   return new Promise((resolve, reject) => {
     wx.request({
       url: BASE_URL + url,
@@ -12,9 +13,12 @@ function request({ url, method = 'GET', data = {}, header = {} }) {
         const body = res.data;
         if (body && body.code === 0) {
           resolve(body.data);
-        } else {
-          reject(body || res);
+          return;
         }
+        if (body && body.code === 401) {
+          clearSession();
+        }
+        reject(body || res);
       },
       fail: reject,
     });
