@@ -4,10 +4,14 @@ from pydantic import BaseModel, ConfigDict
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    openid: str
+    openid: str | None = None
     nickname: str | None = None
     avatar_url: str | None = None
     role: str | None = None
+    family_id: int | None = None
+    family_role: str | None = None
+    account_type: str | None = None
+    status: str | None = None
 
 
 class LoginIn(BaseModel):
@@ -26,6 +30,9 @@ class MemberItem(BaseModel):
     nickname: str | None = None
     avatar_url: str | None = None
     role: str | None = None
+    account_type: str | None = None
+    status: str | None = None
+    family_role: str | None = None
 
 
 class MemberListOut(BaseModel):
@@ -33,7 +40,15 @@ class MemberListOut(BaseModel):
 
 
 class RoleUpdateIn(BaseModel):
-    role: str  # 'admin' | 'user'
+    role: str  # 'admin' | 'member'
+
+
+class ManagedMemberCreateIn(BaseModel):
+    nickname: str
+
+
+class MemberStatusIn(BaseModel):
+    active: bool
 
 
 class FavoriteListOut(BaseModel):

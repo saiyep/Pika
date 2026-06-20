@@ -1,20 +1,56 @@
 <view class="page">
-  <view class="tip">家庭成员（登录后自动加入）。邀请功能将在公网上线后开放。</view>
+  <view class="tip">家庭成员列表。非管理员仅可查看。</view>
+
+  <view wx:if="{{isAdmin}}" class="add-fab" bindtap="onOpenAdd">+</view>
+
   <view wx:if="{{members.length === 0}}" class="empty">暂无成员</view>
-  <view wx:for="{{members}}" wx:key="id" class="member">
+  <view wx:for="{{members}}" wx:key="id" class="member {{item.isActive ? '' : 'member-disabled'}}">
     <view class="info">
       <image wx:if="{{item.avatarUrl}}" class="m-avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
       <view wx:else class="m-avatar-ph">{{item.initial}}</view>
       <text class="name">{{item.nickname || ('用户' + item.id)}}</text>
       <text class="role {{item.role === 'admin' ? 'admin' : ''}}">{{item.roleLabel}}</text>
+      <text class="status {{item.isActive ? 'active' : 'disabled'}}">{{item.statusLabel}}</text>
       <text wx:if="{{item.isMe}}" class="me">我</text>
     </view>
-    <view
-      wx:if="{{isAdmin && !item.isMe}}"
-      class="role-btn"
-      data-id="{{item.id}}"
-      data-role="{{item.role}}"
-      bindtap="onToggleRole"
-    >{{item.role === 'admin' ? '设为普通' : '设为管理员'}}</view>
+
+    <view wx:if="{{isAdmin && !item.isMe}}" class="more-btn" data-id="{{item.id}}" bindtap="onOpenActions">...</view>
+  </view>
+
+  <view wx:if="{{actionVisible}}" class="sheet-mask" bindtap="onCloseActions">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-item" bindtap="onActionEdit">编辑资料</view>
+      <view class="sheet-item" bindtap="onActionToggleRole">{{actionMember.menuLabelRole}}</view>
+      <view class="sheet-item danger" bindtap="onActionToggleActive">{{actionMember.menuLabelActive}}</view>
+      <view class="sheet-cancel" bindtap="onCloseActions">取消</view>
+    </view>
+  </view>
+
+  <view wx:if="{{addVisible}}" class="sheet-mask" bindtap="onCloseAdd">
+    <view class="sheet form-sheet" catchtap="noop">
+      <view class="sheet-title">新增成员</view>
+      <button class="sheet-avatar" open-type="chooseAvatar" bindchooseavatar="onAddChooseAvatar">选择头像（可选）</button>
+      <input class="sheet-input" placeholder="请输入成员昵称" value="{{addNickname}}" bindinput="onAddNicknameInput" />
+      <view class="sheet-switch-row">
+        <text>设为管理员</text>
+        <switch checked="{{addIsAdmin}}" bindchange="onAddAdminSwitch" color="#07c160" />
+      </view>
+      <view class="sheet-actions">
+        <button size="mini" bindtap="onCloseAdd">取消</button>
+        <button size="mini" type="primary" bindtap="onSubmitAdd" loading="{{adding}}" disabled="{{adding}}">确认添加</button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{editVisible}}" class="sheet-mask" bindtap="onCancelEdit">
+    <view class="sheet form-sheet" catchtap="noop">
+      <view class="sheet-title">编辑成员资料</view>
+      <button class="sheet-avatar" open-type="chooseAvatar" bindchooseavatar="onChooseMemberAvatar">选择头像（可选）</button>
+      <input class="sheet-input" placeholder="昵称" value="{{editNickname}}" bindinput="onEditNicknameInput" />
+      <view class="sheet-actions">
+        <button size="mini" bindtap="onCancelEdit">取消</button>
+        <button size="mini" type="primary" bindtap="onSaveEdit" loading="{{savingEdit}}" disabled="{{savingEdit}}">保存</button>
+      </view>
+    </view>
   </view>
 </view>

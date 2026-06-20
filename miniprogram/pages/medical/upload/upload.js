@@ -44,7 +44,7 @@ Page({
   loadMembers() {
     request({ url: '/api/user/members' })
       .then((data) => {
-        const members = data.items || [];
+        const members = (data.items || []).filter((m) => m.status !== 'disabled');
         const myId = (getApp().globalData.user && getApp().globalData.user.id) || null;
         let idx = members.findIndex((m) => m.id === myId);
         if (idx < 0) idx = 0;

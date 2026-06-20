@@ -9,7 +9,7 @@ from app.core.db import Base
 from app.core import models_base  # noqa: F401
 from app.core.user import models as user_models  # noqa: F401
 from app.core.user import service
-from app.core.user.models import User
+from app.core.user.models import FamilyMembership, User
 from app.modules.medical import models  # noqa: F401
 
 
@@ -31,10 +31,11 @@ def db_session():
 
 @pytest.fixture
 def user(db_session):
-    u = User(openid="me", nickname="我")
+    u = User(openid="me", nickname="我", role="admin", account_type="wechat", status="active")
     db_session.add(u)
     db_session.commit()
     db_session.refresh(u)
+    service.ensure_user_family(db_session, user=u)
     return u
 
 
@@ -60,10 +61,11 @@ class TestFavorites:
         assert service.list_favorites(db_session, user_id=user.id) == ["billing"]
 
     def test_per_user(self, db_session, user):
-        other = User(openid="other", nickname="他")
+        other = User(openid="other", nickname="他", account_type="wechat", status="active")
         db_session.add(other)
         db_session.commit()
         db_session.refresh(other)
+        service.ensure_user_family(db_session, user=other)
 
         service.add_favorite(db_session, user_id=user.id, service_key="medical")
         assert service.list_favorites(db_session, user_id=user.id) == ["medical"]
@@ -93,3 +95,82 @@ class TestProfile:
         )
         assert updated.nickname == "爸爸"
         assert updated.avatar_path is not None
+
+
+class TestFamilyMembership:
+    def test_create_managed_member_under_admin(self, db_session, user):
+        managed, membership = service.create_managed_member(db_session, actor=user, nickname="女儿")
+        assert managed.openid is None
+        assert managed.account_type == "managed"
+        assert managed.nickname == "女儿"
+        assert membership.family_role == "member"
+
+        actor_m = service.get_active_membership(db_session, user_id=user.id)
+        assert actor_m is not None
+        assert membership.family_id == actor_m.family_id
+
+    def test_non_admin_cannot_create_managed_member(self, db_session):
+        member = User(openid="member-1", nickname="普通成员", role="member", account_type="wechat", status="active")
+        db_session.add(member)
+        db_session.commit()
+        db_session.refresh(member)
+        service.ensure_user_family(db_session, user=member)
+
+        with pytest.raises(Exception):
+            service.create_managed_member(db_session, actor=member, nickname="孩子")
+
+    def test_set_member_family_role(self, db_session, user):
+        managed, _ = service.create_managed_member(db_session, actor=user, nickname="女儿")
+        _, updated_membership = service.set_member_family_role(
+            db_session,
+            actor=user,
+            member_id=managed.id,
+            family_role="admin",
+        )
+        assert updated_membership.family_role == "admin"
+
+    def test_soft_remove_and_restore_member(self, db_session, user):
+        managed, _ = service.create_managed_member(db_session, actor=user, nickname="女儿")
+
+        member, membership = service.set_member_active(
+            db_session,
+            actor=user,
+            member_id=managed.id,
+            is_active=False,
+        )
+        assert member.status == "disabled"
+        assert membership.is_active is False
+
+        member, membership = service.set_member_active(
+            db_session,
+            actor=user,
+            member_id=managed.id,
+            is_active=True,
+        )
+        assert member.status == "active"
+        assert membership.is_active is True
+
+    def test_update_member_profile(self, db_session, user, tmp_avatar):
+        managed, _ = service.create_managed_member(db_session, actor=user, nickname="旧昵称")
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+        member, _ = service.update_member_profile(
+            db_session,
+            actor=user,
+            member_id=managed.id,
+            nickname="新昵称",
+            avatar=(png, "a.png", "image/png"),
+        )
+        assert member.nickname == "新昵称"
+        assert member.avatar_path is not None
+
+    def test_in_same_family(self, db_session, user):
+        managed, _ = service.create_managed_member(db_session, actor=user, nickname="女儿")
+        assert service.in_same_family(db_session, actor_user_id=user.id, target_user_id=managed.id) is True
+
+        outsider = User(openid="outsider", nickname="外人", role="member", account_type="wechat", status="active")
+        db_session.add(outsider)
+        db_session.commit()
+        db_session.refresh(outsider)
+        service.ensure_user_family(db_session, user=outsider)
+
+        assert service.in_same_family(db_session, actor_user_id=user.id, target_user_id=outsider.id) is False

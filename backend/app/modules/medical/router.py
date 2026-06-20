@@ -2,13 +2,15 @@ import os
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.core import storage
 from app.core.db import get_db
-from app.core.deps import get_current_user
-from app.core.exceptions import NotFoundError, VisionParseError
+from app.core.deps import get_current_membership, get_current_user
+from app.core.exceptions import NotFoundError, PikaException, VisionParseError
+from app.core.user import service as user_service
+from app.core.user.models import FamilyMembership
 from app.core.schemas_base import ApiResponse
 from app.core.user.models import User
 from app.modules.medical import service
@@ -43,6 +45,45 @@ def _detail_out(db: Session, report: MedicalReport) -> ReportDetailOut:
     )
 
 
+def _ensure_subject_in_family(db: Session, actor: User, subject_id: int | None) -> None:
+    if subject_id is None:
+        return
+    subject = db.get(User, subject_id)
+    if not subject:
+        raise NotFoundError("subject not found")
+    if not user_service.in_same_family(db, actor_user_id=actor.id, target_user_id=subject_id):
+        raise PikaException("subject out of family", code=403)
+
+
+def _require_report_access(db: Session, actor: User, report: MedicalReport) -> None:
+    subject_id = report.subject_id or report.uploader_id
+    if not user_service.in_same_family(db, actor_user_id=actor.id, target_user_id=subject_id):
+        raise PikaException("report out of family", code=403)
+
+
+def _require_report_editable(db: Session, actor: User, report: MedicalReport) -> None:
+    _require_report_access(db, actor, report)
+    if not user_service.can_edit_report(
+        db,
+        actor=actor,
+        uploader_id=report.uploader_id,
+        subject_id=report.subject_id,
+    ):
+        raise PikaException("permission denied", code=403)
+
+
+def _family_user_ids(db: Session, membership: FamilyMembership) -> list[int]:
+    return [
+        uid
+        for (uid,) in db.query(FamilyMembership.user_id)
+        .filter(
+            FamilyMembership.family_id == membership.family_id,
+            FamilyMembership.is_active.is_(True),
+        )
+        .all()
+    ]
+
+
 @router.post("/reports", response_model=ApiResponse[ReportDetailOut])
 async def upload_report(
     file: UploadFile = File(...),
@@ -51,7 +92,10 @@ async def upload_report(
     hospital: str | None = Form(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
 ):
+    _ = membership
+    _ensure_subject_in_family(db, user, subject_id)
     content = await file.read()
     report = service.create_report(
         db,
@@ -74,7 +118,10 @@ async def create_report_draft(
     hospital: str | None = Form(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
 ):
+    _ = membership
+    _ensure_subject_in_family(db, user, subject_id)
     payload = []
     for f in files:
         payload.append((await f.read(), f.filename, f.content_type))
@@ -106,7 +153,9 @@ def commit_report_draft(
     body: DraftCommitIn,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
 ):
+    _ = membership
     try:
         report = service.commit_draft(
             db,
@@ -120,6 +169,7 @@ def commit_report_draft(
     except ValueError as e:
         raise NotFoundError(str(e))
 
+    _require_report_access(db, user, report)
     return ApiResponse.ok(_detail_out(db, report))
 
 
@@ -134,9 +184,17 @@ def list_reports(
     size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
 ):
-    q = db.query(MedicalReport)
+    family_user_ids = _family_user_ids(db, membership)
+    q = db.query(MedicalReport).filter(
+        or_(
+            MedicalReport.subject_id.in_(family_user_ids),
+            and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(family_user_ids)),
+        )
+    )
     if subject_id is not None:
+        _ensure_subject_in_family(db, user, subject_id)
         q = q.filter(MedicalReport.subject_id == subject_id)
     if report_type:
         q = q.filter(MedicalReport.report_type == report_type)
@@ -159,7 +217,10 @@ def list_reports(
         .all()
     )
 
-    nickname_by_id = {u.id: u.nickname for u in db.query(User).all()}
+    nickname_by_id = {
+        u.id: u.nickname
+        for u in db.query(User).filter(User.id.in_(family_user_ids)).all()
+    }
     items = []
     for r in rows:
         abnormal = sum(
@@ -187,10 +248,18 @@ def list_reports(
 def list_hospitals(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
 ):
+    family_user_ids = _family_user_ids(db, membership)
     rows = (
         db.query(MedicalReport.hospital)
-        .filter(MedicalReport.hospital.isnot(None))
+        .filter(
+            or_(
+                MedicalReport.subject_id.in_(family_user_ids),
+                and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(family_user_ids)),
+            ),
+            MedicalReport.hospital.isnot(None),
+        )
         .distinct()
         .all()
     )
@@ -202,10 +271,13 @@ def get_report(
     report_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
 ):
+    _ = membership
     report = db.get(MedicalReport, report_id)
     if not report:
         raise NotFoundError("report not found")
+    _require_report_access(db, user, report)
     return ApiResponse.ok(_detail_out(db, report))
 
 
@@ -215,8 +287,16 @@ def update_report(
     body: ReportUpdateIn,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
 ):
-    report = service.update_report(
+    _ = membership
+    report = db.get(MedicalReport, report_id)
+    if report is None:
+        raise NotFoundError("report not found")
+    _require_report_editable(db, user, report)
+    _ensure_subject_in_family(db, user, body.subject_id)
+
+    updated = service.update_report(
         db,
         report_id=report_id,
         report_type=body.report_type,
@@ -226,9 +306,9 @@ def update_report(
         subject_id=body.subject_id,
         metrics=[m.model_dump() for m in body.metrics],
     )
-    if report is None:
+    if updated is None:
         raise NotFoundError("report not found")
-    return ApiResponse.ok(_detail_out(db, report))
+    return ApiResponse.ok(_detail_out(db, updated))
 
 
 @router.delete("/reports/{report_id}", response_model=ApiResponse[None])
@@ -236,7 +316,14 @@ def delete_report(
     report_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
 ):
+    _ = membership
+    report = db.get(MedicalReport, report_id)
+    if not report:
+        raise NotFoundError("report not found")
+    _require_report_editable(db, user, report)
+
     ok = service.delete_report(db, report_id=report_id)
     if not ok:
         raise NotFoundError("report not found")
@@ -248,7 +335,14 @@ def reparse_report(
     report_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
 ):
+    _ = membership
+    existing = db.get(MedicalReport, report_id)
+    if not existing:
+        raise NotFoundError("report not found")
+    _require_report_editable(db, user, existing)
+
     try:
         report = service.reparse_report(db, report_id=report_id)
     except Exception:
@@ -259,10 +353,17 @@ def reparse_report(
 
 
 @router.get("/reports/{report_id}/image")
-def get_report_image(report_id: int, db: Session = Depends(get_db)):
+def get_report_image(
+    report_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
+):
+    _ = membership
     report = db.get(MedicalReport, report_id)
     if not report:
         raise NotFoundError("report not found")
+    _require_report_access(db, user, report)
     path = storage.abs_path(report.image_path)
     if not os.path.exists(path):
         raise NotFoundError("image file missing")
@@ -276,16 +377,25 @@ def metric_trend(
     subject_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
 ):
+    family_user_ids = _family_user_ids(db, membership)
     q = (
         db.query(MedicalReportMetric, MedicalReport)
         .join(MedicalReport, MedicalReportMetric.report_id == MedicalReport.id)
+        .filter(
+            or_(
+                MedicalReport.subject_id.in_(family_user_ids),
+                and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(family_user_ids)),
+            )
+        )
     )
     if item_code:
         q = q.filter(MedicalReportMetric.item_code == item_code)
     elif item_name:
         q = q.filter(MedicalReportMetric.item_name == item_name)
     if subject_id is not None:
+        _ensure_subject_in_family(db, user, subject_id)
         q = q.filter(MedicalReport.subject_id == subject_id)
 
     rows = q.order_by(MedicalReport.report_date.asc()).all()
@@ -318,7 +428,9 @@ def metric_catalog(
     subject_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
 ):
+    family_user_ids = _family_user_ids(db, membership)
     q = (
         db.query(
             MedicalReportMetric.item_code,
@@ -326,8 +438,15 @@ def metric_catalog(
             func.count(MedicalReportMetric.id),
         )
         .join(MedicalReport, MedicalReportMetric.report_id == MedicalReport.id)
+        .filter(
+            or_(
+                MedicalReport.subject_id.in_(family_user_ids),
+                and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(family_user_ids)),
+            )
+        )
     )
     if subject_id is not None:
+        _ensure_subject_in_family(db, user, subject_id)
         q = q.filter(MedicalReport.subject_id == subject_id)
     q = q.group_by(MedicalReportMetric.item_code, MedicalReportMetric.item_name)
 
