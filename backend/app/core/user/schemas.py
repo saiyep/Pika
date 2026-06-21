@@ -51,6 +51,19 @@ class MemberStatusIn(BaseModel):
     active: bool
 
 
+class InviteCreateOut(BaseModel):
+    code: str
+
+
+class InviteQrcodeOut(BaseModel):
+    code: str
+    qrcode_data_url: str
+
+
+class InviteJoinIn(BaseModel):
+    code: str
+
+
 class FavoriteListOut(BaseModel):
     service_keys: list[str]
 

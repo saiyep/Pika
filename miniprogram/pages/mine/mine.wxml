@@ -46,8 +46,12 @@
   </block>
 
   <view class="menu">
-    <view class="menu-item" bindtap="goMembers">
+    <view wx:if="{{loggedIn}}" class="menu-item" bindtap="goMembers">
       <text class="menu-label">成员管理</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view wx:if="{{loggedIn}}" class="menu-item" bindtap="scanJoinMember">
+      <text class="menu-label">扫一扫</text>
       <text class="menu-arrow">›</text>
     </view>
     <view class="menu-item" bindtap="goAbout">

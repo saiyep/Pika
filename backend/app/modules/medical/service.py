@@ -9,10 +9,18 @@ from sqlalchemy.orm import Session
 
 from app.core import storage
 from app.core.exceptions import DuplicateReportError
+from app.core.user import service as user_service
 from app.modules.medical import vision
-from app.modules.medical.models import MedicalReport, MedicalReportMetric
+from app.modules.medical.models import MedicalAclGrant, MedicalReport, MedicalReportMetric
 
 logger = logging.getLogger(__name__)
+
+MEDICAL_ACTIONS = {
+    "view_report",
+    "upload_for_owner",
+    "edit_report",
+    "delete_report",
+}
 
 _DRAFT_TTL = timedelta(hours=1)
 _DRAFTS: dict[str, dict] = {}
@@ -282,9 +290,6 @@ def update_report(
     metrics: list[dict],
     subject_id: int | None = None,
 ) -> MedicalReport | None:
-    """Edit a stored report's header fields and metrics (user correction).
-    Image and content_hash are untouched. Returns None if not found.
-    """
     report = db.get(MedicalReport, report_id)
     if not report:
         return None
@@ -297,8 +302,6 @@ def update_report(
         report.subject_id = subject_id
     report.metrics.clear()
     for i, m in enumerate(metrics):
-        # Re-derive value_num/ref_low/ref_high/abnormal_flag from the edited
-        # text so the trend chart stays consistent after manual correction.
         norm = vision._normalize_metric(
             {
                 "item_name": m.get("item_name"),
@@ -317,3 +320,92 @@ def update_report(
     db.commit()
     db.refresh(report)
     return report
+
+
+def _normalized_actions(actions: list[str]) -> list[str]:
+    uniq = sorted(set(a for a in actions if a in MEDICAL_ACTIONS))
+    return uniq
+
+
+def set_acl_grant(
+    db: Session,
+    *,
+    owner_user_id: int,
+    grantee_user_id: int,
+    actions: list[str],
+) -> MedicalAclGrant:
+    clean = _normalized_actions(actions)
+    grant = (
+        db.query(MedicalAclGrant)
+        .filter(
+            MedicalAclGrant.owner_user_id == owner_user_id,
+            MedicalAclGrant.grantee_user_id == grantee_user_id,
+        )
+        .first()
+    )
+    if clean:
+        if grant is None:
+            grant = MedicalAclGrant(
+                owner_user_id=owner_user_id,
+                grantee_user_id=grantee_user_id,
+                actions_json=clean,
+            )
+            db.add(grant)
+        else:
+            grant.actions_json = clean
+    else:
+        if grant is None:
+            grant = MedicalAclGrant(
+                owner_user_id=owner_user_id,
+                grantee_user_id=grantee_user_id,
+                actions_json=[],
+            )
+            db.add(grant)
+        else:
+            db.delete(grant)
+            db.commit()
+            return MedicalAclGrant(
+                owner_user_id=owner_user_id,
+                grantee_user_id=grantee_user_id,
+                actions_json=[],
+            )
+
+    db.commit()
+    db.refresh(grant)
+    return grant
+
+
+def list_acl_grants(db: Session, *, owner_user_id: int) -> list[MedicalAclGrant]:
+    return (
+        db.query(MedicalAclGrant)
+        .filter(MedicalAclGrant.owner_user_id == owner_user_id)
+        .order_by(MedicalAclGrant.grantee_user_id.asc())
+        .all()
+    )
+
+
+def has_acl_action(
+    db: Session,
+    *,
+    actor_user_id: int,
+    owner_user_id: int,
+    action: str,
+) -> bool:
+    if actor_user_id == owner_user_id:
+        return True
+    if action not in MEDICAL_ACTIONS:
+        return False
+    if not user_service.in_same_family(db, actor_user_id=actor_user_id, target_user_id=owner_user_id):
+        return False
+
+    grant = (
+        db.query(MedicalAclGrant)
+        .filter(
+            MedicalAclGrant.owner_user_id == owner_user_id,
+            MedicalAclGrant.grantee_user_id == actor_user_id,
+        )
+        .first()
+    )
+    if not grant:
+        return False
+    return action in (grant.actions_json or [])

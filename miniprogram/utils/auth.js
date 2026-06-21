@@ -24,32 +24,69 @@ function isLoggedIn() {
 
 function login(nickname) {
   return new Promise((resolve, reject) => {
-    wx.login({
-      success(res) {
-        if (!res.code) {
-          reject(new Error('wx.login no code'));
-          return;
-        }
-        wx.request({
-          url: BASE_URL + '/api/auth/login',
-          method: 'POST',
-          data: { code: res.code, nickname },
-          success(r) {
-            const body = r.data;
-            if (body && body.code === 0) {
-              applyLoginResult(body.data);
-              resolve(body.data);
-            } else {
-              reject(body || r);
+    const wait = (ms, fn) => setTimeout(fn, ms);
+
+    const doAttempt = (retryLeft) => {
+      wx.login({
+        success(res) {
+          if (!res.code) {
+            if (retryLeft > 0) {
+              const attemptNo = 3 - retryLeft;
+              wait(200 * attemptNo, () => doAttempt(retryLeft - 1));
+              return;
             }
-          },
-          fail(err) {
-            reject({ errMsg: err && err.errMsg, url: BASE_URL + '/api/auth/login' });
-          },
-        });
-      },
-      fail: reject,
-    });
+            reject(new Error('wx.login no code'));
+            return;
+          }
+
+          wx.request({
+            url: BASE_URL + '/api/auth/login',
+            method: 'POST',
+            data: { code: res.code, nickname },
+            success(r) {
+              const body = r.data;
+              if (body && body.code === 0) {
+                applyLoginResult(body.data);
+                resolve(body.data);
+                return;
+              }
+              const rawMsg = String((body && (body.msg || body.errMsg)) || '');
+              const canRetryCode = rawMsg.includes('invalid') || rawMsg.includes('code');
+              if (retryLeft > 0 && canRetryCode) {
+                const attemptNo = 3 - retryLeft;
+                wait(250 * attemptNo, () => doAttempt(retryLeft - 1));
+                return;
+              }
+              reject(body || r);
+            },
+            fail(err) {
+              const errMsg = (err && err.errMsg) || '';
+              const isNetworkErr = errMsg.includes('ERR_CONNECTION_RESET')
+                || errMsg.includes('request:fail')
+                || errMsg.includes('timeout')
+                || errMsg.includes('connect')
+                || errMsg.includes('network');
+              if (retryLeft > 0 && isNetworkErr) {
+                const attemptNo = 3 - retryLeft;
+                wait(300 * attemptNo, () => doAttempt(retryLeft - 1));
+                return;
+              }
+              reject({ errMsg, url: BASE_URL + '/api/auth/login' });
+            },
+          });
+        },
+        fail(err) {
+          if (retryLeft > 0) {
+            const attemptNo = 3 - retryLeft;
+            wait(200 * attemptNo, () => doAttempt(retryLeft - 1));
+            return;
+          }
+          reject(err);
+        },
+      });
+    };
+
+    doAttempt(2);
   });
 }
 

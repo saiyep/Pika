@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -47,3 +47,16 @@ class MedicalReportMetric(Base):
     seq: Mapped[int] = mapped_column(Integer, default=0)
 
     report: Mapped["MedicalReport"] = relationship(back_populates="metrics")
+
+
+class MedicalAclGrant(Base):
+    __tablename__ = "medical_acl_grants"
+    __table_args__ = (
+        UniqueConstraint("owner_user_id", "grantee_user_id", name="uq_medical_acl_owner_grantee"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    grantee_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    actions_json: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

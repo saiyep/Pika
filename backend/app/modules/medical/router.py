@@ -21,6 +21,9 @@ from app.modules.medical.schemas import (
     DraftCommitIn,
     DraftMetric,
     DraftOut,
+    MedicalAclGrantIn,
+    MedicalAclGrantOut,
+    MedicalAclListOut,
     MetricOut,
     ReportDetailOut,
     ReportListItem,
@@ -55,21 +58,30 @@ def _ensure_subject_in_family(db: Session, actor: User, subject_id: int | None) 
         raise PikaException("subject out of family", code=403)
 
 
+def _report_owner_user_id(report: MedicalReport) -> int:
+    return report.subject_id or report.uploader_id
+
+
+def _require_action_on_owner(db: Session, actor: User, owner_user_id: int, action: str) -> None:
+    if not service.has_acl_action(
+        db,
+        actor_user_id=actor.id,
+        owner_user_id=owner_user_id,
+        action=action,
+    ):
+        raise PikaException("permission denied", code=403)
+
+
 def _require_report_access(db: Session, actor: User, report: MedicalReport) -> None:
-    subject_id = report.subject_id or report.uploader_id
-    if not user_service.in_same_family(db, actor_user_id=actor.id, target_user_id=subject_id):
-        raise PikaException("report out of family", code=403)
+    _require_action_on_owner(db, actor, _report_owner_user_id(report), "view_report")
 
 
 def _require_report_editable(db: Session, actor: User, report: MedicalReport) -> None:
-    _require_report_access(db, actor, report)
-    if not user_service.can_edit_report(
-        db,
-        actor=actor,
-        uploader_id=report.uploader_id,
-        subject_id=report.subject_id,
-    ):
-        raise PikaException("permission denied", code=403)
+    _require_action_on_owner(db, actor, _report_owner_user_id(report), "edit_report")
+
+
+def _require_report_deletable(db: Session, actor: User, report: MedicalReport) -> None:
+    _require_action_on_owner(db, actor, _report_owner_user_id(report), "delete_report")
 
 
 def _family_user_ids(db: Session, membership: FamilyMembership) -> list[int]:
@@ -84,6 +96,57 @@ def _family_user_ids(db: Session, membership: FamilyMembership) -> list[int]:
     ]
 
 
+def _owner_acl_out(db: Session, owner_user_id: int) -> MedicalAclListOut:
+    grants = service.list_acl_grants(db, owner_user_id=owner_user_id)
+    return MedicalAclListOut(
+        owner_user_id=owner_user_id,
+        grants=[
+            MedicalAclGrantOut(
+                owner_user_id=g.owner_user_id,
+                grantee_user_id=g.grantee_user_id,
+                actions=g.actions_json or [],
+            )
+            for g in grants
+        ],
+    )
+
+
+@router.get("/permissions", response_model=ApiResponse[MedicalAclListOut])
+def get_my_acl(
+    owner_user_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
+):
+    _ = membership
+    owner_id = owner_user_id or user.id
+    _ensure_subject_in_family(db, user, owner_id)
+    if owner_id != user.id:
+        _require_action_on_owner(db, user, owner_id, "view_report")
+    return ApiResponse.ok(_owner_acl_out(db, owner_id))
+
+
+@router.put("/permissions", response_model=ApiResponse[MedicalAclListOut])
+def set_my_acl(
+    body: MedicalAclGrantIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
+):
+    _ = membership
+    if body.grantee_user_id == user.id:
+        raise PikaException("cannot set acl for self", code=400)
+    _ensure_subject_in_family(db, user, body.grantee_user_id)
+
+    service.set_acl_grant(
+        db,
+        owner_user_id=user.id,
+        grantee_user_id=body.grantee_user_id,
+        actions=body.actions,
+    )
+    return ApiResponse.ok(_owner_acl_out(db, user.id))
+
+
 @router.post("/reports", response_model=ApiResponse[ReportDetailOut])
 async def upload_report(
     file: UploadFile = File(...),
@@ -96,6 +159,8 @@ async def upload_report(
 ):
     _ = membership
     _ensure_subject_in_family(db, user, subject_id)
+    owner_user_id = subject_id or user.id
+    _require_action_on_owner(db, user, owner_user_id, "upload_for_owner")
     content = await file.read()
     report = service.create_report(
         db,
@@ -122,6 +187,8 @@ async def create_report_draft(
 ):
     _ = membership
     _ensure_subject_in_family(db, user, subject_id)
+    owner_user_id = subject_id or user.id
+    _require_action_on_owner(db, user, owner_user_id, "upload_for_owner")
     payload = []
     for f in files:
         payload.append((await f.read(), f.filename, f.content_type))
@@ -187,14 +254,22 @@ def list_reports(
     membership: FamilyMembership = Depends(get_current_membership),
 ):
     family_user_ids = _family_user_ids(db, membership)
+    visible_owner_ids = [
+        uid for uid in family_user_ids
+        if service.has_acl_action(db, actor_user_id=user.id, owner_user_id=uid, action="view_report")
+    ]
+    if not visible_owner_ids:
+        return ApiResponse.ok(ReportListOut(total=0, items=[]))
+
     q = db.query(MedicalReport).filter(
         or_(
-            MedicalReport.subject_id.in_(family_user_ids),
-            and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(family_user_ids)),
+            MedicalReport.subject_id.in_(visible_owner_ids),
+            and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(visible_owner_ids)),
         )
     )
     if subject_id is not None:
         _ensure_subject_in_family(db, user, subject_id)
+        _require_action_on_owner(db, user, subject_id, "view_report")
         q = q.filter(MedicalReport.subject_id == subject_id)
     if report_type:
         q = q.filter(MedicalReport.report_type == report_type)
@@ -251,12 +326,19 @@ def list_hospitals(
     membership: FamilyMembership = Depends(get_current_membership),
 ):
     family_user_ids = _family_user_ids(db, membership)
+    visible_owner_ids = [
+        uid for uid in family_user_ids
+        if service.has_acl_action(db, actor_user_id=user.id, owner_user_id=uid, action="view_report")
+    ]
+    if not visible_owner_ids:
+        return ApiResponse.ok([])
+
     rows = (
         db.query(MedicalReport.hospital)
         .filter(
             or_(
-                MedicalReport.subject_id.in_(family_user_ids),
-                and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(family_user_ids)),
+                MedicalReport.subject_id.in_(visible_owner_ids),
+                and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(visible_owner_ids)),
             ),
             MedicalReport.hospital.isnot(None),
         )
@@ -295,6 +377,8 @@ def update_report(
         raise NotFoundError("report not found")
     _require_report_editable(db, user, report)
     _ensure_subject_in_family(db, user, body.subject_id)
+    if body.subject_id is not None:
+        _require_action_on_owner(db, user, body.subject_id, "edit_report")
 
     updated = service.update_report(
         db,
@@ -322,7 +406,7 @@ def delete_report(
     report = db.get(MedicalReport, report_id)
     if not report:
         raise NotFoundError("report not found")
-    _require_report_editable(db, user, report)
+    _require_report_deletable(db, user, report)
 
     ok = service.delete_report(db, report_id=report_id)
     if not ok:
@@ -380,13 +464,29 @@ def metric_trend(
     membership: FamilyMembership = Depends(get_current_membership),
 ):
     family_user_ids = _family_user_ids(db, membership)
+    visible_owner_ids = [
+        uid for uid in family_user_ids
+        if service.has_acl_action(db, actor_user_id=user.id, owner_user_id=uid, action="view_report")
+    ]
+    if not visible_owner_ids:
+        return ApiResponse.ok(
+            TrendOut(
+                item_code=item_code,
+                item_name=item_name or "",
+                unit=None,
+                ref_low=None,
+                ref_high=None,
+                points=[],
+            )
+        )
+
     q = (
         db.query(MedicalReportMetric, MedicalReport)
         .join(MedicalReport, MedicalReportMetric.report_id == MedicalReport.id)
         .filter(
             or_(
-                MedicalReport.subject_id.in_(family_user_ids),
-                and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(family_user_ids)),
+                MedicalReport.subject_id.in_(visible_owner_ids),
+                and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(visible_owner_ids)),
             )
         )
     )
@@ -396,6 +496,7 @@ def metric_trend(
         q = q.filter(MedicalReportMetric.item_name == item_name)
     if subject_id is not None:
         _ensure_subject_in_family(db, user, subject_id)
+        _require_action_on_owner(db, user, subject_id, "view_report")
         q = q.filter(MedicalReport.subject_id == subject_id)
 
     rows = q.order_by(MedicalReport.report_date.asc()).all()
@@ -431,6 +532,13 @@ def metric_catalog(
     membership: FamilyMembership = Depends(get_current_membership),
 ):
     family_user_ids = _family_user_ids(db, membership)
+    visible_owner_ids = [
+        uid for uid in family_user_ids
+        if service.has_acl_action(db, actor_user_id=user.id, owner_user_id=uid, action="view_report")
+    ]
+    if not visible_owner_ids:
+        return ApiResponse.ok(CatalogOut(items=[]))
+
     q = (
         db.query(
             MedicalReportMetric.item_code,
@@ -440,13 +548,14 @@ def metric_catalog(
         .join(MedicalReport, MedicalReportMetric.report_id == MedicalReport.id)
         .filter(
             or_(
-                MedicalReport.subject_id.in_(family_user_ids),
-                and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(family_user_ids)),
+                MedicalReport.subject_id.in_(visible_owner_ids),
+                and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(visible_owner_ids)),
             )
         )
     )
     if subject_id is not None:
         _ensure_subject_in_family(db, user, subject_id)
+        _require_action_on_owner(db, user, subject_id, "view_report")
         q = q.filter(MedicalReport.subject_id == subject_id)
     q = q.group_by(MedicalReportMetric.item_code, MedicalReportMetric.item_name)
 

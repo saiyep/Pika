@@ -15,6 +15,12 @@
 .me { font-size: 22rpx; color: #4b8bf4; background: #eaf1fe; border-radius: 6rpx; padding: 4rpx 14rpx; }
 .more-btn { min-width: 56rpx; height: 56rpx; border-radius: 28rpx; background: #f4f4f4; color: #555; display: flex; align-items: center; justify-content: center; font-size: 34rpx; line-height: 1; }
 .add-fab { position: fixed; right: 30rpx; bottom: 48rpx; width: 92rpx; height: 92rpx; border-radius: 46rpx; background: #07c160; color: #fff; font-size: 56rpx; display: flex; align-items: center; justify-content: center; box-shadow: 0 8rpx 24rpx rgba(7,193,96,0.35); z-index: 20; }
+.invite-sheet { align-items: center; }
+.invite-title { text-align: center; width: 100%; }
+.invite-qrcode { width: 360rpx; height: 360rpx; margin: 16rpx auto 10rpx; border-radius: 12rpx; background: #fff; display: block; }
+.invite-code { text-align: center; width: 100%; font-size: 44rpx; letter-spacing: 6rpx; color: #222; font-weight: 600; margin: 12rpx 0 18rpx; }
+.sheet-desc { text-align: center; font-size: 24rpx; color: #888; margin-bottom: 12rpx; line-height: 1.5; }
+.invite-actions { justify-content: center; width: 100%; }
 
 .sheet-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: flex; align-items: flex-end; justify-content: center; z-index: 30; }
 .sheet { width: 100%; background: #fff; border-radius: 20rpx 20rpx 0 0; padding: 12rpx 0 20rpx; }

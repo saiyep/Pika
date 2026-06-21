@@ -14,6 +14,9 @@ from app.core.user.models import User
 from app.core.user.schemas import (
     FavoriteIn,
     FavoriteListOut,
+    InviteCreateOut,
+    InviteJoinIn,
+    InviteQrcodeOut,
     ManagedMemberCreateIn,
     MemberItem,
     MemberListOut,
@@ -21,6 +24,7 @@ from app.core.user.schemas import (
     RoleUpdateIn,
     UserOut,
 )
+from app.core.wechat import invite_qrcode_data_url
 
 router = APIRouter(prefix="/api/user", tags=["user"])
 
@@ -88,6 +92,47 @@ def list_members(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    rows = service.list_family_members(db, user=user, include_inactive=True)
+    return ApiResponse.ok(
+        MemberListOut(
+            items=[
+                _member_item(
+                    member,
+                    family_role=membership.family_role,
+                    is_active=membership.is_active,
+                )
+                for member, membership in rows
+            ]
+        )
+    )
+
+
+@router.post("/members/invite", response_model=ApiResponse[InviteCreateOut])
+def create_member_invite(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    invite = service.create_family_invite(db, actor=user)
+    return ApiResponse.ok(InviteCreateOut(code=invite.code))
+
+
+@router.post("/members/invite/qrcode", response_model=ApiResponse[InviteQrcodeOut])
+def create_member_invite_qrcode(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    invite = service.create_family_invite(db, actor=user)
+    qrcode_data_url = invite_qrcode_data_url(code=invite.code)
+    return ApiResponse.ok(InviteQrcodeOut(code=invite.code, qrcode_data_url=qrcode_data_url))
+
+
+@router.post("/members/join", response_model=ApiResponse[MemberListOut])
+def join_members_by_invite(
+    body: InviteJoinIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    service.join_family_by_invite(db, actor=user, code=body.code)
     rows = service.list_family_members(db, user=user, include_inactive=True)
     return ApiResponse.ok(
         MemberListOut(

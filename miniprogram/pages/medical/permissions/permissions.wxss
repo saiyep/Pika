@@ -1,0 +1,11 @@
+.page { padding: 24rpx 28rpx 40rpx; }
+.tip { font-size: 24rpx; color: #888; margin-bottom: 18rpx; line-height: 1.5; }
+.loading, .empty { margin-top: 120rpx; text-align: center; color: #999; font-size: 28rpx; }
+.card { background: #fff; border-radius: 14rpx; padding: 20rpx; margin-bottom: 18rpx; }
+.member-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10rpx; }
+.name { font-size: 30rpx; color: #222; font-weight: 600; }
+.role { font-size: 22rpx; color: #666; background: #f0f0f0; border-radius: 6rpx; padding: 4rpx 12rpx; }
+.action-row { display: flex; align-items: center; justify-content: space-between; padding: 14rpx 0; border-bottom: 1rpx solid #f5f5f5; }
+.action-row:last-of-type { border-bottom: none; }
+.label { font-size: 28rpx; color: #333; }
+.save-btn { margin-top: 14rpx; color: #07c160; border-color: #07c160; background: #fff; }

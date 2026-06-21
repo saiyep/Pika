@@ -1,10 +1,12 @@
 <view class="page">
-  <view class="tip">家庭成员列表。非管理员仅可查看。</view>
+  <view class="tip">成员列表。非管理员仅可查看。</view>
 
-  <view wx:if="{{isAdmin}}" class="add-fab" bindtap="onOpenAdd">+</view>
+  <view wx:if="{{!myId}}" class="empty">请先在“我”页完成登录</view>
 
-  <view wx:if="{{members.length === 0}}" class="empty">暂无成员</view>
-  <view wx:for="{{members}}" wx:key="id" class="member {{item.isActive ? '' : 'member-disabled'}}">
+  <view wx:if="{{myId && isAdmin}}" class="add-fab" bindtap="onOpenPlusActions">+</view>
+
+  <view wx:if="{{myId && members.length === 0}}" class="empty">暂无成员</view>
+  <view wx:if="{{myId}}" wx:for="{{members}}" wx:key="id" class="member {{item.rowClass}}">
     <view class="info">
       <image wx:if="{{item.avatarUrl}}" class="m-avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
       <view wx:else class="m-avatar-ph">{{item.initial}}</view>
@@ -50,6 +52,17 @@
       <view class="sheet-actions">
         <button size="mini" bindtap="onCancelEdit">取消</button>
         <button size="mini" type="primary" bindtap="onSaveEdit" loading="{{savingEdit}}" disabled="{{savingEdit}}">保存</button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{inviteVisible}}" class="sheet-mask" bindtap="onCloseInvite">
+    <view class="sheet form-sheet invite-sheet" catchtap="noop">
+      <view class="sheet-title invite-title">邀请微信好友</view>
+      <view class="sheet-desc">请对方在“我”页点击“扫一扫”后，扫描此二维码加入</view>
+      <image wx:if="{{inviteQrcodeUrl}}" class="invite-qrcode" src="{{inviteQrcodeUrl}}" mode="aspectFit" />
+      <view class="sheet-actions invite-actions">
+        <button size="mini" type="primary" bindtap="onCloseInvite">关闭</button>
       </view>
     </view>
   </view>

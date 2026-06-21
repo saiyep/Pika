@@ -9,4 +9,7 @@ Page({
   goTrend() {
     wx.navigateTo({ url: '/pages/medical/metric-trend/metric-trend' });
   },
+  goPermissions() {
+    wx.navigateTo({ url: '/pages/medical/permissions/permissions' });
+  },
 });

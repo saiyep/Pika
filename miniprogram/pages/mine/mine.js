@@ -47,7 +47,13 @@ Page({
         const safeUser = user && typeof user === 'object' ? user : {};
         this.apply(safeUser);
       })
-      .catch(() => this.setLoggedOutState());
+      .catch((err) => {
+        if (err && err.code === 401) {
+          this.setLoggedOutState();
+          return;
+        }
+        wx.showToast({ title: '刷新失败', icon: 'none' });
+      });
   },
 
   apply(user) {
@@ -129,8 +135,12 @@ Page({
     const nickname = this.data.editNickname || '';
     const avatar = this.data.pendingAvatar;
 
-    const finish = () => {
-      this.setData({ editing: false, pendingAvatar: '' });
+    const finish = (updatedUser) => {
+      if (updatedUser && typeof updatedUser === 'object' && updatedUser.id) {
+        this.apply(updatedUser);
+      } else {
+        this.setData({ editing: false, pendingAvatar: '' });
+      }
       this.refresh();
       wx.showToast({ title: '已保存', icon: 'success' });
     };
@@ -145,7 +155,7 @@ Page({
         success: (res) => {
           try {
             const body = JSON.parse(res.data);
-            if (body.code === 0) finish();
+            if (body && body.code === 0) finish(body.data);
             else wx.showToast({ title: '保存失败', icon: 'none' });
           } catch (_e) {
             wx.showToast({ title: '保存失败', icon: 'none' });
@@ -165,7 +175,7 @@ Page({
       },
       data: { nickname },
       success: (res) => {
-        if (res.data && res.data.code === 0) finish();
+        if (res.data && res.data.code === 0) finish(res.data.data);
         else wx.showToast({ title: '保存失败', icon: 'none' });
       },
       fail: () => wx.showToast({ title: '网络错误', icon: 'none' }),
@@ -178,6 +188,14 @@ Page({
       return;
     }
     wx.navigateTo({ url: '/pages/medical/members/members' });
+  },
+
+  scanJoinMember() {
+    if (!this.data.loggedIn) {
+      ensureLoginWithModal();
+      return;
+    }
+    wx.navigateTo({ url: '/pages/medical/members/members?scan=1' });
   },
 
   goAbout() {

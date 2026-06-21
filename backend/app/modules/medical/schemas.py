@@ -120,3 +120,19 @@ class ReportUpdateIn(BaseModel):
     hospital: str | None = None
     subject_id: int | None = None
     metrics: list[DraftMetric]
+
+
+class MedicalAclGrantIn(BaseModel):
+    grantee_user_id: int
+    actions: list[str]
+
+
+class MedicalAclGrantOut(BaseModel):
+    owner_user_id: int
+    grantee_user_id: int
+    actions: list[str]
+
+
+class MedicalAclListOut(BaseModel):
+    owner_user_id: int
+    grants: list[MedicalAclGrantOut]

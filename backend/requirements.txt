@@ -8,6 +8,7 @@ openai
 httpx
 python-multipart
 pillow
+qrcode
 
 # dev / test
 pytest

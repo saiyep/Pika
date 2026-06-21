@@ -1,8 +1,11 @@
+import secrets
+import string
+
 from sqlalchemy.orm import Session
 
 from app.core import storage
 from app.core.exceptions import PikaException
-from app.core.user.models import FamilyGroup, FamilyMembership, User, UserFavorite
+from app.core.user.models import FamilyGroup, FamilyInvite, FamilyMembership, User, UserFavorite
 
 
 def list_favorites(db: Session, *, user_id: int) -> list[str]:
@@ -251,3 +254,83 @@ def can_edit_report(db: Session, *, actor: User, uploader_id: int, subject_id: i
     if subject_id is not None and subject_id == actor.id:
         return True
     return False
+
+
+def _new_invite_code(db: Session) -> str:
+    alphabet = string.ascii_uppercase + string.digits
+    while True:
+        code = ''.join(secrets.choice(alphabet) for _ in range(8))
+        exists = db.query(FamilyInvite.id).filter(FamilyInvite.code == code).first()
+        if not exists:
+            return code
+
+
+def create_family_invite(db: Session, *, actor: User) -> FamilyInvite:
+    membership = require_family_admin(db, user=actor)
+    code = _new_invite_code(db)
+    invite = FamilyInvite(
+        family_id=membership.family_id,
+        inviter_user_id=actor.id,
+        code=code,
+        status="active",
+    )
+    db.add(invite)
+    db.commit()
+    db.refresh(invite)
+    return invite
+
+
+def join_family_by_invite(db: Session, *, actor: User, code: str) -> FamilyMembership:
+    clean = (code or "").strip().upper()
+    if not clean:
+        raise PikaException("invite code required", code=400)
+
+    invite = db.query(FamilyInvite).filter(FamilyInvite.code == clean).first()
+    if not invite or invite.status != "active":
+        raise PikaException("invalid invite code", code=404)
+
+    existing = (
+        db.query(FamilyMembership)
+        .filter(
+            FamilyMembership.family_id == invite.family_id,
+            FamilyMembership.user_id == actor.id,
+            FamilyMembership.is_active.is_(True),
+        )
+        .first()
+    )
+    if existing:
+        invite.status = "used"
+        invite.used_by_user_id = actor.id
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    actor_membership = get_active_membership(db, user_id=actor.id)
+    if actor_membership and actor_membership.family_id != invite.family_id:
+        actor_membership.is_active = False
+
+    membership = (
+        db.query(FamilyMembership)
+        .filter(
+            FamilyMembership.family_id == invite.family_id,
+            FamilyMembership.user_id == actor.id,
+        )
+        .first()
+    )
+    if membership:
+        membership.is_active = True
+        membership.family_role = membership.family_role or "member"
+    else:
+        membership = FamilyMembership(
+            family_id=invite.family_id,
+            user_id=actor.id,
+            family_role="member",
+            is_active=True,
+        )
+        db.add(membership)
+
+    invite.status = "used"
+    invite.used_by_user_id = actor.id
+    db.commit()
+    db.refresh(membership)
+    return membership
