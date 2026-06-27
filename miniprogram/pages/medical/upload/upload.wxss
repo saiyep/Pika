@@ -52,6 +52,9 @@
 .m-name { background: #fff; border-radius: 10rpx; padding: 12rpx; font-size: 26rpx; margin-bottom: 10rpx; }
 .metric-grid { display: grid; grid-template-columns: 1.2fr 0.8fr 1.2fr; gap: 10rpx; }
 .m-value, .m-unit, .m-ref { background: #fff; border-radius: 10rpx; padding: 12rpx; font-size: 24rpx; }
+.retry-card { background: #fff; border-radius: 18rpx; padding: 20rpx 24rpx; margin-bottom: 20rpx; box-shadow: 0 6rpx 18rpx rgba(0,0,0,0.04); }
+.retry-title { font-size: 28rpx; font-weight: 600; color: #222; margin-bottom: 8rpx; }
+.retry-desc { font-size: 22rpx; color: #999; line-height: 1.6; }
 .bottom-bar { position: fixed; left: 24rpx; right: 24rpx; bottom: 24rpx; background: rgba(246,247,249,0.96); padding-top: 12rpx; }
 .dual-actions { display: flex; gap: 16rpx; }
 .act { width: 100%; border-radius: 16rpx; font-size: 30rpx; }

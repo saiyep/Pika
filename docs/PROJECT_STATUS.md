@@ -20,14 +20,21 @@
 
 | 优先级 | 状态 | ID | 标题 | 明细 |
 | --- | --- | --- | --- | --- |
-| P0 | todo | TKT-001 | 自动微信登录体验改造 | `docs/tickets/TKT-001-auto-wechat-login.md` |
-| P0 | todo | TKT-002 | 上传识别与提交自动重试反馈 | `docs/tickets/TKT-002-upload-retry-feedback.md` |
+| P0 | doing | TKT-001 | 自动微信登录体验改造 | `docs/tickets/TKT-001-auto-wechat-login.md` |
+| P0 | done | TKT-002 | 上传识别与提交自动重试反馈 | `docs/tickets/TKT-002-upload-retry-feedback.md` |
 | P0 | todo | TKT-003 | 上传成功后导航回流优化 | `docs/tickets/TKT-003-post-submit-navigation.md` |
-| P0 | todo | TKT-004 | 家人记录不可见的权限提示与策略评估 | `docs/tickets/TKT-004-family-visibility-guidance.md` |
-| P0 | todo | TKT-005 | 扫码加入闭环真机验收 | `docs/tickets/TKT-005-invite-join-device-validation.md` |
+| P0 | todo | TKT-004 | 就医权限默认未向家庭成员全开 | `docs/tickets/TKT-004-family-visibility-guidance.md` |
+| P0 | todo | TKT-010 | 就医成员选择器 UI/UX 与权限联动统一 | `docs/tickets/TKT-010-unified-member-filter-ux.md` |
 | P1 | todo | TKT-006 | 关注指标体系与医院自动识别主路径 | `docs/tickets/TKT-006-focus-metrics-and-hospital-recognition.md` |
 | P1 | todo | TKT-007 | 检查单类别识别与关注指标联动 | `docs/tickets/TKT-007-report-category-recognition.md` |
 | P1 | todo | TKT-008 | 就医浏览体验真机验收与交互微调 | `docs/tickets/TKT-008-medical-browsing-device-polish.md` |
+| P1 | todo | TKT-009 | 趋势图点按缺少数值 tooltip | `docs/tickets/TKT-009-trend-point-tooltip.md` |
+
+### 已完成 / 已验收
+
+| 优先级 | 状态 | ID | 标题 | 明细 |
+| --- | --- | --- | --- | --- |
+| P0 | done | TKT-005 | 扫码加入闭环真机验收 | `docs/tickets/TKT-005-invite-join-device-validation.md` |
 
 ### 候选池（未升格成 active ticket）
 
@@ -35,6 +42,23 @@
 - P2：更多报告类型适配与指标标准化词典完善。
 
 进入 active backlog 前，先按 `docs/tickets/TICKET_TEMPLATE.md` 建 ticket，再回写到上表。
+## 建议执行顺序（当前 P0）
+
+### Loop 1
+- `TKT-001` 自动微信登录体验改造
+
+### Loop 2
+- `TKT-002` 上传识别与提交自动重试反馈
+- `TKT-003` 上传成功后导航回流优化
+
+### Loop 3
+- `TKT-004` 就医权限默认未向家庭成员全开
+
+### Loop 4
+- `TKT-010` 就医成员选择器 UI/UX 与权限联动统一
+
+> 原则：P0 以串行为主；仅在同一用户流内（如上传链路）合并推进，避免多条 loop 同时改同一批页面和状态流。
+
 ## 关键约定（维持）
 
 - `PROJECT_STATUS.md` 是全局高层入口；单项 backlog 明细写在 `docs/tickets/*.md`。

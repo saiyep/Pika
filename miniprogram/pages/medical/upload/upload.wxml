@@ -90,6 +90,11 @@
       </view>
     </view>
 
+    <view wx:if="{{committing}}" class="retry-card">
+      <view class="retry-title">{{commitRetrying ? '网络波动，正在重试提交' : '正在提交检查单'}}</view>
+      <view class="retry-desc">请保持在当前页面，提交完成后会自动返回历史记录。</view>
+    </view>
+
     <view class="bottom-bar dual-actions">
       <button class="act ghost" bindtap="chooseImage" disabled="{{committing}}">返回重选</button>
       <button class="act primary" bindtap="submitDraft" loading="{{committing}}" disabled="{{committing}}">
