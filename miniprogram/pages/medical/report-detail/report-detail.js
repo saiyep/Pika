@@ -1,5 +1,6 @@
 const { request } = require('../../../utils/request');
 const { BASE_URL } = require('../../../config');
+const { clearSession, ensureSession, getToken } = require('../../../utils/auth');
 
 const PRESET_HOSPITALS = ['北京大学国际医院', '北京协和医院', '北京积水潭医院', '北京大学肿瘤医院'];
 const HOSPITAL_OPTIONS = [...PRESET_HOSPITALS, '其他（可输入）'];
@@ -20,27 +21,27 @@ Page({
   data: {
     report: {},
     metrics: [],
-    imageUrl: '',
     reportId: '',
     uploadedAt: '',
     reparsing: false,
     editing: false,
     saving: false,
-    // edit-mode fields
+    imageLoading: false,
+    imageLoaded: false,
+    imageTempUrl: '',
     editLabel: '',
     editDate: '',
     editMetrics: [],
     hospitalOptions: HOSPITAL_OPTIONS,
     hospitalIndex: OTHER_INDEX,
     hospitalCustom: '',
-    // 被检查者
     members: [],
     memberLabels: [],
     subjectIndex: 0,
   },
   onLoad(query) {
     const id = query.id;
-    this.setData({ reportId: id, imageUrl: BASE_URL + '/api/medical/reports/' + id + '/image' });
+    this.setData({ reportId: id });
     this.loadMembers();
     this.load();
   },
@@ -67,13 +68,62 @@ Page({
   },
   fmtTime(s) {
     if (!s) return '';
-    // 后端 created_at 形如 "2026-06-09T08:30:00"，截到分钟，空格分隔
     return String(s).replace('T', ' ').slice(0, 16);
   },
-  previewImage() {
-    if (this.data.imageUrl) {
-      wx.previewImage({ urls: [this.data.imageUrl] });
+  downloadReportImage() {
+    const doDownload = () => {
+      const token = getToken();
+      return new Promise((resolve, reject) => {
+        wx.downloadFile({
+          url: `${BASE_URL}/api/medical/reports/${this.data.reportId}/image`,
+          header: { 'X-Pika-Token': token },
+          success: (res) => {
+            if (res.statusCode === 200 && res.tempFilePath) {
+              resolve(res.tempFilePath);
+              return;
+            }
+            reject({ code: res.statusCode, errMsg: 'download failed', tempFilePath: res.tempFilePath || '' });
+          },
+          fail: reject,
+        });
+      });
+    };
+
+    this.setData({ imageLoading: true });
+    return doDownload()
+      .catch((err) => {
+        if (!(err && (err.code === 401 || err.code === 403))) {
+          throw err;
+        }
+        clearSession();
+        return ensureSession().then((ok) => {
+          if (!ok) throw err;
+          return doDownload();
+        });
+      })
+      .then((tempFilePath) => {
+        this.setData({ imageTempUrl: tempFilePath, imageLoaded: true });
+        return tempFilePath;
+      })
+      .finally(() => {
+        this.setData({ imageLoading: false });
+      });
+  },
+  ensureImageReady() {
+    if (this.data.imageTempUrl) {
+      return Promise.resolve(this.data.imageTempUrl);
     }
+    return this.downloadReportImage();
+  },
+  onViewImageTap() {
+    if (this.data.imageLoading) return;
+    this.ensureImageReady()
+      .then((path) => {
+        wx.previewImage({ urls: [path] });
+      })
+      .catch(() => {
+        wx.showToast({ title: '原图加载失败', icon: 'none' });
+      });
   },
 
   enterEdit() {

@@ -401,6 +401,102 @@ def test_medical_acl_actions(db_session, user):
     assert service.has_acl_action(db_session, actor_user_id=spouse.id, owner_user_id=user.id, action="delete_report") is False
 
 
+def test_metric_trend_marks_mixed_reference_ranges(db_session, user, tmp_upload, monkeypatch):
+    from app.modules.medical import router
+
+    parsed_a = {
+        **_FAKE_PARSED,
+        "metrics": [
+            {
+                "item_name": "WBC", "item_code": "WBC", "value_text": "11",
+                "value_num": 11.0, "unit": "10^9/L", "ref_range": "4-9",
+                "ref_low": 4.0, "ref_high": 9.0, "abnormal_flag": "high", "seq": 0,
+            }
+        ],
+    }
+    parsed_b = {
+        **_FAKE_PARSED,
+        "metrics": [
+            {
+                "item_name": "WBC", "item_code": "WBC", "value_text": "8",
+                "value_num": 8.0, "unit": "10^9/L", "ref_range": "3.5-9.5",
+                "ref_low": 3.5, "ref_high": 9.5, "abnormal_flag": "normal", "seq": 0,
+            }
+        ],
+    }
+
+    monkeypatch.setattr(vision, "parse_report_image", lambda b: (parsed_a if b.endswith(b"a") else parsed_b, "{}"))
+
+    d1 = service.create_draft_from_images(
+        db_session, uploader_id=user.id, subject_id=user.id,
+        files=[(b"\x89PNG\r\n\x1a\n a", "a.png", "image/png")], hospital_override="医院A",
+    )
+    _commit(db_session, d1)
+
+    d2 = service.create_draft_from_images(
+        db_session, uploader_id=user.id, subject_id=user.id,
+        files=[(b"\x89PNG\r\n\x1a\n b", "b.png", "image/png")], hospital_override="医院B",
+    )
+    _commit(db_session, d2)
+
+    membership = user_service.get_active_membership(db_session, user_id=user.id)
+    out = router.metric_trend(
+        item_code="WBC",
+        item_name=None,
+        subject_id=user.id,
+        db=db_session,
+        user=user,
+        membership=membership,
+    )
+
+    assert out.data is not None
+    assert out.data.has_mixed_reference is True
+    assert out.data.ref_low is None
+    assert out.data.ref_high is None
+    assert len(out.data.points) == 2
+    assert out.data.points[0].value_text is not None
+    assert out.data.points[0].ref_range is not None
+    assert out.data.points[0].unit == "10^9/L"
+
+
+def test_list_reports_filters_multiple_hospitals(db_session, user, tmp_upload, monkeypatch):
+    from app.modules.medical import router
+
+    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+
+    for hospital, content in [
+        ("医院A", b"\x89PNG\r\n\x1a\n a"),
+        ("医院B", b"\x89PNG\r\n\x1a\n b"),
+        ("医院C", b"\x89PNG\r\n\x1a\n c"),
+    ]:
+        draft = service.create_draft_from_images(
+            db_session,
+            uploader_id=user.id,
+            subject_id=user.id,
+            files=[(content, f"{hospital}.png", "image/png")],
+            hospital_override=hospital,
+        )
+        _commit(db_session, draft)
+
+    membership = user_service.get_active_membership(db_session, user_id=user.id)
+    out = router.list_reports(
+        subject_id=user.id,
+        report_type=None,
+        hospital=["医院A", "医院C"],
+        date_from=None,
+        date_to=None,
+        page=1,
+        size=20,
+        db=db_session,
+        user=user,
+        membership=membership,
+    )
+
+    assert out.data is not None
+    assert {item.hospital for item in out.data.items} == {"医院A", "医院C"}
+    assert out.data.total == 2
+
+
 def test_medical_acl_requires_same_family(db_session, user):
     outsider = User(openid="outsider-openid", nickname="外人", role="member", account_type="wechat", status="active")
     db_session.add(outsider)

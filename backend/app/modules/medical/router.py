@@ -244,7 +244,7 @@ def commit_report_draft(
 def list_reports(
     subject_id: int | None = Query(default=None),
     report_type: str | None = Query(default=None),
-    hospital: str | None = Query(default=None),
+    hospital: list[str] | None = Query(default=None),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
@@ -274,7 +274,9 @@ def list_reports(
     if report_type:
         q = q.filter(MedicalReport.report_type == report_type)
     if hospital:
-        q = q.filter(MedicalReport.hospital == hospital)
+        hospital_values = [h for h in hospital if h]
+        if hospital_values:
+            q = q.filter(MedicalReport.hospital.in_(hospital_values))
     if date_from:
         q = q.filter(MedicalReport.report_date >= date_from)
     if date_to:
@@ -476,6 +478,7 @@ def metric_trend(
                 unit=None,
                 ref_low=None,
                 ref_high=None,
+                has_mixed_reference=False,
                 points=[],
             )
         )
@@ -499,12 +502,29 @@ def metric_trend(
         _require_action_on_owner(db, user, subject_id, "view_report")
         q = q.filter(MedicalReport.subject_id == subject_id)
 
-    rows = q.order_by(MedicalReport.report_date.asc()).all()
+    rows = q.order_by(
+        MedicalReport.report_date.is_(None),
+        MedicalReport.report_date.asc(),
+        MedicalReport.created_at.asc(),
+        MedicalReport.id.asc(),
+        MedicalReportMetric.seq.asc(),
+    ).all()
+
+    reference_keys = {
+        (metric.ref_low, metric.ref_high, metric.ref_range)
+        for metric, _ in rows
+    }
+    has_mixed_reference = len(reference_keys) > 1
 
     points = [
         TrendPoint(
             report_date=rep.report_date,
+            value_text=metric.value_text,
             value_num=metric.value_num,
+            unit=metric.unit,
+            ref_range=metric.ref_range,
+            ref_low=metric.ref_low,
+            ref_high=metric.ref_high,
             abnormal_flag=metric.abnormal_flag,
             report_id=rep.id,
             hospital=rep.hospital,
@@ -517,8 +537,9 @@ def metric_trend(
             item_code=item_code or (first.item_code if first else None),
             item_name=item_name or (first.item_name if first else ""),
             unit=first.unit if first else None,
-            ref_low=first.ref_low if first else None,
-            ref_high=first.ref_high if first else None,
+            ref_low=None if has_mixed_reference else (first.ref_low if first else None),
+            ref_high=None if has_mixed_reference else (first.ref_high if first else None),
+            has_mixed_reference=has_mixed_reference,
             points=points,
         )
     )

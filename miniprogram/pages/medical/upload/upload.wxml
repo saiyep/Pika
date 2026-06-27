@@ -1,47 +1,100 @@
 <view class="page">
-  <view class="section" wx:if="{{step === 'pick'}}">
-    <text class="section-title">被检查人</text>
-    <picker mode="selector" range="{{memberLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">
-      <view class="picker">{{memberLabels[subjectIndex] || '（未登录成员）'}}</view>
-    </picker>
+  <view class="hero">
+    <view class="hero-title">上传检查单</view>
+    <view class="hero-subtitle">可拍照或从相册导入，支持同一次上传多张同类检查单。</view>
   </view>
 
-  <view class="section">
-    <text class="section-title">医院</text>
-    <picker mode="selector" range="{{hospitalOptions}}" value="{{hospitalIndex}}" bindchange="onHospitalPick">
-      <view class="picker">{{hospitalOptions[hospitalIndex]}}</view>
-    </picker>
-    <input wx:if="{{hospitalIndex === hospitalOptions.length - 1}}" class="input" placeholder="请输入医院名称" value="{{hospitalCustom}}" bindinput="onHospitalCustomInput" />
-  </view>
+  <block wx:if="{{step === 'pick'}}">
+    <view class="card">
+      <view class="section-title">被检查人</view>
+      <picker mode="selector" range="{{memberLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">
+        <view class="picker-row">
+          <text class="picker-label">当前成员</text>
+          <text class="picker-value">{{memberLabels[subjectIndex] || '（未登录成员）'}}</text>
+          <text class="picker-arrow">›</text>
+        </view>
+      </picker>
+    </view>
 
-  <view wx:if="{{step === 'pick'}}">
-    <view class="preview-list" wx:if="{{files.length}}">
-      <view class="preview-item" wx:for="{{files}}" wx:key="id">
-        <image src="{{item.path}}" mode="aspectFill" />
-        <text class="remove" data-id="{{item.id}}" bindtap="removeImage">✕</text>
+    <view class="card">
+      <view class="section-title">检查单图片</view>
+      <view wx:if="{{!files.length}}" class="upload-dropzone" bindtap="chooseImage">
+        <view class="upload-icon">＋</view>
+        <view class="upload-title">添加检查单</view>
+        <view class="upload-subtitle">支持拍照或从相册导入，可多张</view>
+      </view>
+      <block wx:else>
+        <view class="preview-list">
+          <view class="preview-item" wx:for="{{files}}" wx:key="id">
+            <image src="{{item.path}}" mode="aspectFill" />
+            <text class="remove" data-id="{{item.id}}" bindtap="removeImage">✕</text>
+          </view>
+        </view>
+        <button class="btn choose-btn" bindtap="chooseImage">继续添加</button>
+      </block>
+    </view>
+
+    <view wx:if="{{uploading}}" class="progress-card">
+      <view class="progress-title">{{uploadRetrying ? '网络波动，正在重试' : '上传识别中'}}</view>
+      <view class="progress-desc">{{uploadStageText || '正在分析图片内容并提取关注的检查信息，请稍候…'}}</view>
+      <view class="progress-number">{{uploadProgress}}%</view>
+      <progress percent="{{uploadProgress}}" active stroke-width="6" color="#07c160" />
+      <view class="progress-hint">识别通常需要一段时间，请不要离开当前页面。</view>
+    </view>
+
+    <view class="bottom-bar" wx:if="{{files.length}}">
+      <button class="act primary" bindtap="createDraft" loading="{{uploading}}" disabled="{{uploading}}">
+        {{uploading ? (uploadRetrying ? '重试中…' : '识别中…') : '开始识别'}}
+      </button>
+    </view>
+  </block>
+
+  <block wx:elif="{{step === 'edit'}}">
+    <view class="card summary-card">
+      <view class="section-title">确认检查信息</view>
+      <view class="summary-hint">请核对识别结果，补全必填信息后再保存。</view>
+      <view class="section mini">
+        <text class="section-title required">* 被检查人</text>
+        <picker mode="selector" range="{{memberLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">
+          <view class="picker-row">
+            <text class="picker-label">当前成员</text>
+            <text class="picker-value">{{memberLabels[subjectIndex] || '请选择被检查人'}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+      <view class="section mini">
+        <text class="section-title required">* 医院</text>
+        <input class="input" placeholder="识别不出时请手动填写医院" value="{{hospital}}" bindinput="onHospitalInput" />
+      </view>
+      <view class="section mini">
+        <text class="section-title required">* 报告类型</text>
+        <input class="input" placeholder="如：血常规" value="{{reportTypeLabel}}" bindinput="onReportTypeInput" />
+      </view>
+      <view class="section mini">
+        <text class="section-title required">* 报告日期</text>
+        <input class="input" placeholder="如：2026-03-20" value="{{reportDate}}" bindinput="onReportDateInput" />
+      </view>
+      <view class="summary-row"><text class="summary-label">上传时间</text><text class="summary-value">本次上传后自动记录</text></view>
+    </view>
+
+    <view class="card result-card">
+      <text class="result-title">识别结果（可手动修正后保存）</text>
+      <view wx:for="{{metrics}}" wx:key="seq" class="metric-card">
+        <input class="m-name" data-idx="{{index}}" data-field="item_name" value="{{item.item_name}}" bindinput="onMetricFieldInput" />
+        <view class="metric-grid">
+          <input class="m-value" data-idx="{{index}}" data-field="value_text" value="{{item.value_text}}" bindinput="onMetricFieldInput" />
+          <input class="m-unit" data-idx="{{index}}" data-field="unit" value="{{item.unit}}" bindinput="onMetricFieldInput" />
+          <input class="m-ref" data-idx="{{index}}" data-field="ref_range" value="{{item.ref_range}}" bindinput="onMetricFieldInput" />
+        </view>
       </view>
     </view>
 
-    <button class="btn" bindtap="chooseImage">{{files.length ? '重新选择（可多张）' : '拍照 / 选择检查单（可多张）'}}</button>
-    <button wx:if="{{files.length}}" class="btn primary" bindtap="createDraft" loading="{{uploading}}" disabled="{{uploading}}">
-      {{uploading ? '识别中…' : '开始识别并编辑'}}
-    </button>
-  </view>
-
-  <view wx:if="{{step === 'edit'}}" class="result">
-    <text class="result-title">识别结果（可手动修正后提交）</text>
-    <view class="section mini">
-      <text class="section-title">报告类型标签</text>
-      <input class="input" placeholder="如：血常规" value="{{reportTypeLabel}}" bindinput="onReportTypeInput" />
+    <view class="bottom-bar dual-actions">
+      <button class="act ghost" bindtap="chooseImage" disabled="{{committing}}">返回重选</button>
+      <button class="act primary" bindtap="submitDraft" loading="{{committing}}" disabled="{{committing}}">
+        {{committing ? (commitRetrying ? '重试中…' : '提交中…') : '确认并保存'}}
+      </button>
     </view>
-
-    <view wx:for="{{metrics}}" wx:key="seq" class="metric">
-      <input class="m-name" data-idx="{{index}}" data-field="item_name" value="{{item.item_name}}" bindinput="onMetricFieldInput" />
-      <input class="m-value" data-idx="{{index}}" data-field="value_text" value="{{item.value_text}}" bindinput="onMetricFieldInput" />
-      <input class="m-unit" data-idx="{{index}}" data-field="unit" value="{{item.unit}}" bindinput="onMetricFieldInput" />
-      <input class="m-ref" data-idx="{{index}}" data-field="ref_range" value="{{item.ref_range}}" bindinput="onMetricFieldInput" />
-    </view>
-
-    <button class="btn primary" bindtap="submitDraft">确认无误并提交</button>
-  </view>
+  </block>
 </view>

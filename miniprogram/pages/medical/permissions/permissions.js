@@ -11,14 +11,17 @@ Page({
   data: {
     loading: false,
     saving: false,
-    myId: null,
     members: [],
+    memberLabels: [],
     grants: {},
+    selectedMemberIndex: 0,
+    selectedMemberId: null,
+    draftActions: [],
+    originalActions: [],
+    actionOptions: ACTIONS,
   },
 
   onShow() {
-    const user = getApp().globalData.user || {};
-    this.setData({ myId: user.id || null });
     this.loadData();
   },
 
@@ -29,26 +32,35 @@ Page({
       request({ url: '/api/medical/permissions' }),
     ])
       .then(([membersData, aclData]) => {
-        const myId = this.data.myId;
+        const ownerUserId = Number((aclData && aclData.owner_user_id) || 0);
         const grantsMap = {};
         (aclData.grants || []).forEach((g) => {
-          grantsMap[g.grantee_user_id] = g.actions || [];
+          grantsMap[Number(g.grantee_user_id)] = g.actions || [];
         });
 
         const members = (membersData.items || [])
-          .filter((m) => m.id !== myId && m.status !== 'disabled')
-          .map((m) => {
-            const actions = grantsMap[m.id] || [];
-            return {
-              ...m,
-              actionItems: ACTIONS.map((a) => ({
-                ...a,
-                checked: actions.indexOf(a.key) >= 0,
-              })),
-            };
-          });
+          .filter((m) => Number(m.id) !== ownerUserId && m.status !== 'disabled')
+          .map((m) => ({
+            ...m,
+            id: Number(m.id),
+            roleLabel: m.family_role === 'admin' ? '管理员' : '普通成员',
+            initial: (m.nickname || ('用户' + m.id))[0],
+          }));
 
-        this.setData({ members, grants: grantsMap });
+        const selectedMemberIndex = 0;
+        const selectedMember = members[selectedMemberIndex] || null;
+        const selectedMemberId = selectedMember ? selectedMember.id : null;
+        const selectedActions = selectedMemberId ? (grantsMap[selectedMemberId] || []) : [];
+
+        this.setData({
+          members,
+          memberLabels: members.map((m) => m.nickname || ('用户' + m.id)),
+          grants: grantsMap,
+          selectedMemberIndex,
+          selectedMemberId,
+          draftActions: [...selectedActions],
+          originalActions: [...selectedActions],
+        });
       })
       .catch(() => {
         wx.showToast({ title: '加载失败', icon: 'none' });
@@ -58,29 +70,36 @@ Page({
       });
   },
 
-  onToggleAction(e) {
-    const memberId = Number(e.currentTarget.dataset.memberId);
-    const action = e.currentTarget.dataset.action;
-    const checked = !!e.detail.value;
-
-    const members = this.data.members.map((m) => {
-      if (m.id !== memberId) return m;
-      const actionItems = m.actionItems.map((item) =>
-        item.key === action ? { ...item, checked } : item
-      );
-      return { ...m, actionItems };
+  onMemberPick(e) {
+    const selectedMemberIndex = Number(e.detail.value);
+    const member = this.data.members[selectedMemberIndex] || null;
+    const memberId = member ? Number(member.id) : null;
+    const actions = memberId ? (this.data.grants[memberId] || []) : [];
+    this.setData({
+      selectedMemberIndex,
+      selectedMemberId: memberId,
+      draftActions: [...actions],
+      originalActions: [...actions],
     });
-
-    this.setData({ members });
   },
 
-  onSaveMember(e) {
-    if (this.data.saving) return;
-    const memberId = Number(e.currentTarget.dataset.memberId);
-    const member = this.data.members.find((m) => m.id === memberId);
-    if (!member) return;
+  onToggleAction(e) {
+    const action = e.currentTarget.dataset.action;
+    const checked = !!e.detail.value;
+    const current = new Set(this.data.draftActions || []);
+    if (checked) current.add(action);
+    else current.delete(action);
+    this.setData({ draftActions: Array.from(current) });
+  },
 
-    const actions = member.actionItems.filter((i) => i.checked).map((i) => i.key);
+  onCancelMember() {
+    this.setData({ draftActions: [...this.data.originalActions] });
+  },
+
+  onSaveMember() {
+    if (this.data.saving || !this.data.selectedMemberId) return;
+    const memberId = Number(this.data.selectedMemberId);
+    const actions = this.data.draftActions || [];
     this.setData({ saving: true });
     request({
       url: '/api/medical/permissions',
@@ -88,6 +107,11 @@ Page({
       data: { grantee_user_id: memberId, actions },
     })
       .then(() => {
+        const grants = { ...this.data.grants, [memberId]: [...actions] };
+        this.setData({
+          grants,
+          originalActions: [...actions],
+        });
         wx.showToast({ title: '已保存', icon: 'success' });
       })
       .catch(() => {

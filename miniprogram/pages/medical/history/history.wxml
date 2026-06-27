@@ -1,14 +1,26 @@
 <view class="page">
   <view class="filters">
     <picker class="f-item" mode="selector" range="{{subjectLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">
-      <view class="f-pick">{{subjectLabels[subjectIndex]}} ▾</view>
-    </picker>
-    <picker class="f-item" mode="selector" range="{{hospitalLabels}}" value="{{hospitalIndex}}" bindchange="onHospitalPick">
-      <view class="f-pick">{{hospitalLabels[hospitalIndex]}} ▾</view>
+      <view class="f-pick">{{subjectLabels.length ? subjectLabels[subjectIndex] : '选择成员'}} ▾</view>
     </picker>
     <picker class="f-item" mode="selector" range="{{timeRanges}}" value="{{timeIndex}}" bindchange="onTimePick">
       <view class="f-pick">{{timeRanges[timeIndex]}} ▾</view>
     </picker>
+    <view class="f-item" bindtap="toggleHospitalPanel">
+      <view class="f-pick">{{selectedHospitalSummary()}} ▾</view>
+    </view>
+  </view>
+
+  <view wx:if="{{hospitalPanelOpen}}" class="hospital-panel">
+    <view class="panel-head">
+      <text class="panel-title">医院筛选</text>
+      <text class="panel-clear" bindtap="clearHospitals">清空</text>
+    </view>
+    <view class="hospital-options">
+      <view wx:for="{{hospitals}}" wx:key="item" class="hospital-chip {{selectedHospitals.indexOf(item) >= 0 ? 'active' : ''}}" data-hospital="{{item}}" bindtap="onHospitalToggle">
+        {{item}}
+      </view>
+    </view>
   </view>
 
   <view wx:if="{{showCustom}}" class="custom-range">

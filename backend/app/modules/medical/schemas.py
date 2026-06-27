@@ -57,7 +57,12 @@ class ReportListOut(BaseModel):
 
 class TrendPoint(BaseModel):
     report_date: date | None = None
+    value_text: str | None = None
     value_num: float | None = None
+    unit: str | None = None
+    ref_range: str | None = None
+    ref_low: float | None = None
+    ref_high: float | None = None
     abnormal_flag: str | None = None
     report_id: int
     hospital: str | None = None
@@ -69,6 +74,7 @@ class TrendOut(BaseModel):
     unit: str | None = None
     ref_low: float | None = None
     ref_high: float | None = None
+    has_mixed_reference: bool = False
     points: list[TrendPoint]
 
 

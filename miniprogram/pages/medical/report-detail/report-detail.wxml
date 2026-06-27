@@ -1,27 +1,16 @@
 <view class="page">
-  <view class="image-wrap">
-    <image src="{{imageUrl}}" mode="widthFix" bindtap="previewImage" />
-  </view>
-
-  <!-- 顶部操作栏 -->
-  <view class="toolbar">
-    <block wx:if="{{!editing}}">
-      <view class="tool-btn" bindtap="enterEdit">编辑</view>
-    </block>
-    <block wx:else>
-      <view class="tool-btn ghost" bindtap="cancelEdit">取消</view>
-      <view class="tool-btn primary {{saving ? 'disabled' : ''}}" bindtap="saveEdit">{{saving ? '保存中…' : '保存'}}</view>
-    </block>
-  </view>
-
   <!-- 只读态 -->
   <block wx:if="{{!editing}}">
-    <view class="info">
-      <text class="type">{{report.report_type_label || report.report_type}}</text>
-      <text class="date">{{report.report_date || '日期未知'}} · {{report.hospital || '医院未知'}}</text>
+    <view class="info-head">
+      <view class="info-main">
+        <text class="type">{{report.report_type_label || report.report_type}}</text>
+      </view>
+      <view class="tool-btn" bindtap="enterEdit">编辑</view>
     </view>
+
     <view class="meta">
       <text class="meta-line">被检查者：{{report.subject_nickname || '未指定'}}</text>
+      <text class="meta-line">医院：{{report.hospital || '未知'}}</text>
       <text class="meta-line">报告时间：{{report.report_date || '未知'}}</text>
       <text class="meta-line">上传时间：{{uploadedAt || '未知'}}</text>
     </view>
@@ -43,10 +32,21 @@
         <text class="c-ref">{{item.ref_range || '—'}}</text>
       </view>
     </view>
+
+    <view class="image-entry">
+      <view class="image-link {{imageLoading ? 'disabled' : ''}}" bindtap="onViewImageTap">
+        {{imageLoading ? '原图加载中…' : '查看原图'}}
+      </view>
+    </view>
   </block>
 
   <!-- 编辑态 -->
   <block wx:else>
+    <view class="toolbar">
+      <view class="tool-btn ghost" bindtap="cancelEdit">取消</view>
+      <view class="tool-btn primary {{saving ? 'disabled' : ''}}" bindtap="saveEdit">{{saving ? '保存中…' : '保存'}}</view>
+    </view>
+
     <view class="edit-section">
       <text class="field-label">被检查者</text>
       <picker mode="selector" range="{{memberLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">

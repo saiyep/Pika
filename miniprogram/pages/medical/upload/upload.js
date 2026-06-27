@@ -1,35 +1,49 @@
 const { BASE_URL } = require('../../../config');
 const { request } = require('../../../utils/request');
 
-const PRESET_HOSPITALS = ['北京大学国际医院', '北京协和医院', '北京积水潭医院', '北京大学肿瘤医院'];
-const HOSPITAL_OPTIONS = [...PRESET_HOSPITALS, '其他（可输入）'];
-const OTHER_INDEX = PRESET_HOSPITALS.length;
-
-// 模糊匹配：解析出的医院名包含某预设项关键词则选中该项，否则归"其他"。
-function matchHospital(name) {
-  if (!name) return { index: OTHER_INDEX, custom: '' };
-  for (let i = 0; i < PRESET_HOSPITALS.length; i++) {
-    const key = PRESET_HOSPITALS[i].replace(/^北京/, '');
-    if (name.indexOf(key) >= 0 || name.indexOf(PRESET_HOSPITALS[i]) >= 0) {
-      return { index: i, custom: '' };
-    }
-  }
-  return { index: OTHER_INDEX, custom: name };
-}
 
 Page({
+  withRetries(taskFn, options = {}) {
+    const maxRetries = options.maxRetries == null ? 2 : options.maxRetries;
+    const shouldRetry = options.shouldRetry || (() => false);
+    const onRetry = options.onRetry || (() => {});
+
+    const run = (attempt) => taskFn().catch((err) => {
+      if (attempt <= maxRetries && shouldRetry(err)) {
+        onRetry(attempt, err);
+        return run(attempt + 1);
+      }
+      throw err;
+    });
+
+    return run(1);
+  },
+
+  isTransientErr(err) {
+    const msg = String((err && (err.message || err.errMsg || err.msg)) || '').toLowerCase();
+    if (!msg) return false;
+    return msg.includes('network')
+      || msg.includes('timeout')
+      || msg.includes('reset')
+      || msg.includes('request:fail')
+      || msg.includes('connect')
+      || msg.includes('http 5');
+  },
+
   data: {
     files: [],
     uploading: false,
+    uploadRetrying: false,
+    uploadProgress: 0,
+    uploadStageText: '',
+    committing: false,
+    commitRetrying: false,
     step: 'pick', // pick -> edit
     draftId: '',
     reportType: 'unknown',
     reportTypeLabel: '',
     reportDate: '',
     hospital: '',
-    hospitalOptions: HOSPITAL_OPTIONS,
-    hospitalIndex: OTHER_INDEX,
-    hospitalCustom: '',
     metrics: [],
     // 被检查人（报告属于谁）
     members: [],
@@ -68,19 +82,16 @@ Page({
     return m ? m.id : '';
   },
 
-  // 当前生效的医院名：选了预设项用预设名，选"其他"用自定义输入。
   resolvedHospital() {
-    return this.data.hospitalIndex === OTHER_INDEX
-      ? this.data.hospitalCustom
-      : PRESET_HOSPITALS[this.data.hospitalIndex];
+    return (this.data.hospital || '').trim();
   },
 
-  onHospitalPick(e) {
-    this.setData({ hospitalIndex: Number(e.detail.value) });
+  onHospitalInput(e) {
+    this.setData({ hospital: e.detail.value || '' });
   },
 
-  onHospitalCustomInput(e) {
-    this.setData({ hospitalCustom: e.detail.value || '' });
+  onReportDateInput(e) {
+    this.setData({ reportDate: e.detail.value || '' });
   },
 
   chooseImage() {
@@ -93,7 +104,17 @@ Page({
           id: `${Date.now()}-${i}`,
           path: f.tempFilePath,
         }));
-        this.setData({ files: picked, step: 'pick', draftId: '', metrics: [] });
+        this.setData({
+          files: picked,
+          step: 'pick',
+          draftId: '',
+          metrics: [],
+          reportType: 'unknown',
+          reportTypeLabel: '',
+          reportDate: '',
+          hospital: '',
+        });
+        wx.setNavigationBarTitle({ title: '上传检查单' });
       },
     });
   },
@@ -117,70 +138,94 @@ Page({
   },
 
   createDraft() {
-    if (!this.data.files.length) return;
+    if (!this.data.files.length || this.data.uploading) return;
     const token = getApp().globalData.token || wx.getStorageSync('token') || '';
 
-    // 没有 token 直接提示(说明登录没成功)
     if (!token) {
       wx.showModal({
         title: '未登录',
-        content: '没有拿到登录 token，无法上传。多半是 app.js 自动登录失败（检查后端 /api/auth/login 与微信 AppSecret）。',
+        content: '没有拿到登录 token，无法上传。多半是自动登录失败，请先回“我”页登录。',
         showCancel: false,
       });
       return;
     }
 
-    this.setData({ uploading: true });
+    let progressTimer = null;
+    const startProgress = () => {
+      this.setData({
+        uploading: true,
+        uploadRetrying: false,
+        uploadProgress: 8,
+        uploadStageText: '正在上传图片并识别检查项，请稍候…',
+      });
+      progressTimer = setInterval(() => {
+        const next = Math.min(90, (this.data.uploadProgress || 0) + 6);
+        this.setData({ uploadProgress: next });
+      }, 800);
+    };
+    const stopProgress = () => {
+      if (progressTimer) clearInterval(progressTimer);
+      progressTimer = null;
+    };
 
-    const uploads = this.data.files.map((f) =>
-      new Promise((resolve, reject) => {
-        wx.uploadFile({
-          url: BASE_URL + '/api/medical/report-drafts',
-          filePath: f.path,
-          name: 'files',
-          timeout: 60000,
-          formData: {
-            hospital: this.resolvedHospital(),
-            subject_id: this.subjectId(),
-          },
-          header: { 'X-Pika-Token': token },
-          success: (res) => {
-            try {
-              const body = JSON.parse(res.data);
-              if (body.code === 0) {
-                resolve(body.data);
-              } else {
-                const e = new Error(body.msg || `code=${body.code}`);
-                e.bizCode = body.code;
-                reject(e);
+    startProgress();
+
+    const parseOnce = () => {
+      const uploads = this.data.files.map((f) =>
+        new Promise((resolve, reject) => {
+          wx.uploadFile({
+            url: BASE_URL + '/api/medical/report-drafts',
+            filePath: f.path,
+            name: 'files',
+            timeout: 60000,
+            formData: {
+              subject_id: this.subjectId(),
+            },
+            header: { 'X-Pika-Token': token },
+            success: (res) => {
+              try {
+                const body = JSON.parse(res.data);
+                if (body.code === 0) {
+                  resolve(body.data);
+                } else {
+                  const e = new Error(body.msg || `code=${body.code}`);
+                  e.bizCode = body.code;
+                  reject(e);
+                }
+              } catch (_e) {
+                reject(new Error(`HTTP ${res.statusCode}: ${String(res.data).slice(0, 200)}`));
               }
-            } catch (_e) {
-              reject(new Error(`HTTP ${res.statusCode}: ${String(res.data).slice(0, 200)}`));
-            }
-          },
-          fail: (e) => reject(new Error('网络错误: ' + (e.errMsg || ''))),
-        });
-      })
-    );
+            },
+            fail: (e) => reject(new Error('网络错误: ' + (e.errMsg || ''))),
+          });
+        })
+      );
+      return Promise.all(uploads);
+    };
 
-    Promise.all(uploads)
+    this.withRetries(parseOnce, {
+      maxRetries: 2,
+      shouldRetry: (err) => this.isTransientErr(err) && !(err && err.bizCode),
+      onRetry: () => this.setData({
+        uploadRetrying: true,
+        uploadStageText: '网络波动，正在重试识别…',
+      }),
+    })
       .then((all) => {
+        this.setData({ uploadProgress: 100, uploadStageText: '识别完成，正在整理结果…' });
         const first = all[0];
         const enterEdit = () => {
-          const matched = matchHospital(first.hospital || this.resolvedHospital());
           this.setData({
             step: 'edit',
             draftId: first.draft_id,
             reportType: first.report_type || 'unknown',
             reportTypeLabel: first.report_type_label || '',
             reportDate: first.report_date || '',
-            hospital: first.hospital || this.resolvedHospital(),
-            hospitalIndex: matched.index,
-            hospitalCustom: matched.custom,
+            hospital: first.hospital || '',
             metrics: first.metrics || [],
           });
+          wx.setNavigationBarTitle({ title: '确认检查信息' });
         };
-        // 软提醒：模型判定不是检查单时，让用户决定是否继续。
         if (first.is_lab_report === false) {
           wx.showModal({
             title: '可能不是检查单',
@@ -203,41 +248,84 @@ Page({
         });
       })
       .finally(() => {
-        this.setData({ uploading: false });
+        stopProgress();
+        this.setData({
+          uploading: false,
+          uploadRetrying: false,
+          uploadProgress: 0,
+          uploadStageText: '',
+        });
       });
   },
 
   submitDraft() {
-    if (!this.data.draftId) return;
+    if (!this.data.draftId || this.data.committing) return;
 
-    const reportTypeLabel = this.data.reportTypeLabel || null;
-    const reportType = reportTypeLabel ? 'custom' : this.data.reportType;
+    const subjectId = this.subjectId();
+    const hospital = this.resolvedHospital();
+    const reportTypeLabel = (this.data.reportTypeLabel || '').trim();
+    const reportDate = (this.data.reportDate || '').trim();
 
-    request({
+    if (!subjectId) {
+      wx.showToast({ title: '请选择被检查人', icon: 'none' });
+      return;
+    }
+    if (!hospital) {
+      wx.showToast({ title: '请填写医院', icon: 'none' });
+      return;
+    }
+    if (!reportTypeLabel) {
+      wx.showToast({ title: '请填写报告类型', icon: 'none' });
+      return;
+    }
+    if (!reportDate) {
+      wx.showToast({ title: '请填写报告日期', icon: 'none' });
+      return;
+    }
+
+    const reportType = 'custom';
+
+    this.setData({ committing: true, commitRetrying: false });
+
+    const commitOnce = () => request({
       url: `/api/medical/report-drafts/${this.data.draftId}/commit`,
       method: 'POST',
       data: {
         report_type: reportType,
         report_type_label: reportTypeLabel,
-        report_date: this.data.reportDate || null,
-        hospital: this.resolvedHospital() || null,
+        report_date: reportDate,
+        hospital,
         metrics: this.data.metrics,
       },
+    });
+
+    this.withRetries(commitOnce, {
+      maxRetries: 2,
+      shouldRetry: (err) => this.isTransientErr(err) && !(err && err.code),
+      onRetry: () => this.setData({ commitRetrying: true }),
     })
-      .then((data) => {
+      .then(() => {
         this.setData({
           step: 'pick',
           draftId: '',
           files: [],
           metrics: [],
+          reportType: 'unknown',
+          reportTypeLabel: '',
+          reportDate: '',
+          hospital: '',
         });
-        wx.showToast({ title: '提交成功', icon: 'success' });
+        wx.setNavigationBarTitle({ title: '上传检查单' });
+        wx.showToast({ title: '保存成功', icon: 'success' });
         setTimeout(() => {
-          wx.navigateTo({ url: `/pages/medical/report-detail/report-detail?id=${data.report.id}` });
+          wx.redirectTo({ url: '/pages/medical/history/history' });
         }, 300);
       })
       .catch(() => {
         wx.showToast({ title: '提交失败', icon: 'none' });
+      })
+      .finally(() => {
+        this.setData({ committing: false, commitRetrying: false });
       });
   },
 });

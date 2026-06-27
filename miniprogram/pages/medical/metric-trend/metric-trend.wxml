@@ -1,33 +1,79 @@
 <view class="page">
-  <view class="filter-bar">
-    <text class="filter-label">查看</text>
-    <picker mode="selector" range="{{filterLabels}}" value="{{filterIndex}}" bindchange="onFilterPick">
-      <view class="filter-picker">{{filterLabels[filterIndex]}} ▾</view>
-    </picker>
+  <view class="hero">
+    <text class="hero-title">指标趋势</text>
+    <text class="hero-subtitle">先选择成员，再查看该成员某项指标的历史变化</text>
   </view>
 
-  <view class="picker-bar">
-    <picker mode="selector" range="{{catalogLabels}}" value="{{selectedIndex}}" bindchange="onPick">
-      <view class="picker">
-        {{catalog.length ? catalog[selectedIndex].item_name : '选择指标'}}
-        <text class="arrow">▾</text>
-      </view>
-    </picker>
-  </view>
-
-  <view wx:if="{{trend}}" class="chart-card">
-    <text class="chart-title">{{trend.item_name}} {{trend.unit ? '(' + trend.unit + ')' : ''}}</text>
-    <canvas type="2d" id="trendCanvas" class="chart"></canvas>
-    <view class="legend">
-      <text class="legend-band">浅绿区间 = 参考范围</text>
-      <text class="legend-dot">点颜色 = 医院来源（见下方列表）</text>
+  <view wx:if="{{membersLoading}}" class="state-card">加载成员中…</view>
+  <view wx:elif="{{members.length === 0}}" class="state-card">暂无可查看成员</view>
+  <block wx:else>
+    <view class="select-card">
+      <text class="section-title">成员</text>
+      <picker mode="selector" range="{{memberLabels}}" value="{{selectedMemberIndex}}" bindchange="onMemberPick">
+        <view class="picker-row">
+          <text class="picker-label">查看成员</text>
+          <text class="picker-value">{{memberLabels[selectedMemberIndex]}} ▾</text>
+        </view>
+      </picker>
+      <text class="section-tip">趋势仅支持单个成员查看</text>
     </view>
-    <view wx:if="{{trend.points && trend.points.length}}" class="legend-list">
-      <view wx:for="{{trend.points}}" wx:key="report_id" class="legend-row">
-        <text>{{item.report_date || '日期未知'}}：{{item.hospital || '医院未知'}}</text>
-      </view>
-    </view>
-  </view>
 
-  <view wx:if="{{catalog.length === 0}}" class="empty">暂无可展示的指标，请先上传检查单</view>
+    <view class="select-card" wx:if="{{selectedMemberId}}">
+      <text class="section-title">指标</text>
+      <view wx:if="{{catalogLoading}}" class="state-inline">正在加载该成员的指标…</view>
+      <view wx:elif="{{catalog.length === 0}}" class="state-inline">该成员暂无可展示指标，请先上传检查单</view>
+      <picker wx:else mode="selector" range="{{catalogLabels}}" value="{{selectedIndex}}" bindchange="onPick">
+        <view class="picker-row">
+          <text class="picker-label">选择指标</text>
+          <text class="picker-value">{{catalog[selectedIndex].item_name}} ▾</text>
+        </view>
+      </picker>
+    </view>
+
+    <view wx:if="{{trendLoading}}" class="state-card">正在加载趋势数据…</view>
+
+    <view wx:if="{{trend}}" class="content-card">
+      <text class="content-title">{{trend.item_name}} {{trend.unit ? '(' + trend.unit + ')' : ''}}</text>
+
+      <view class="view-switch">
+        <view class="switch-item {{viewMode === 'table' ? 'active' : ''}}" data-mode="table" bindtap="onSwitchView">数据表</view>
+        <view class="switch-item {{viewMode === 'chart' ? 'active' : ''}}" data-mode="chart" bindtap="onSwitchView">趋势图</view>
+      </view>
+
+      <block wx:if="{{viewMode === 'table'}}">
+        <view class="metrics">
+          <view class="m-head">
+            <text class="c-date">日期</text>
+            <text class="c-hospital">医院</text>
+            <text class="c-value">结果</text>
+            <text class="c-ref">参考范围</text>
+          </view>
+          <view wx:for="{{tableRows}}" wx:key="report_id" class="m-row {{item.abnormal_flag === 'high' || item.abnormal_flag === 'low' ? 'abnormal' : ''}}" data-report-id="{{item.report_id}}" bindtap="onTableRowTap">
+            <text class="c-date">{{item.displayDate}}</text>
+            <text class="c-hospital">{{item.displayHospital}}</text>
+            <text class="c-value">{{item.displayValue}}</text>
+            <text class="c-ref">{{item.displayRef}}</text>
+          </view>
+        </view>
+      </block>
+
+      <block wx:else>
+        <view wx:if="{{chartPointsCount > 0}}" class="chart-wrap">
+          <canvas type="2d" id="trendCanvas" class="chart" bindtap="onChartTap"></canvas>
+          <view wx:if="{{activeTooltip}}" class="chart-tooltip" style="left: {{activeTooltip.left}}px; top: {{activeTooltip.top}}px;">
+            <text class="tooltip-date">{{activeTooltip.displayDate}}</text>
+            <text class="tooltip-value">{{activeTooltip.displayValue}}</text>
+            <text class="tooltip-meta">{{activeTooltip.displayHospital}}</text>
+            <text wx:if="{{activeTooltip.displayRef !== '—'}}" class="tooltip-meta">参考范围 {{activeTooltip.displayRef}}</text>
+          </view>
+          <view class="legend">
+            <text class="legend-band">浅绿区间 = 参考范围</text>
+            <text class="legend-dot">点颜色 = 医院来源</text>
+          </view>
+          <view wx:if="{{trend.has_mixed_reference}}" class="chart-note">参考范围可能随报告变化，请以表格为准</view>
+        </view>
+        <view wx:else class="empty-inline">暂无可绘制数值趋势</view>
+      </block>
+    </view>
+  </block>
 </view>

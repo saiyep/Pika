@@ -1,6 +1,6 @@
 const { BASE_URL } = require('../../config');
 const { request } = require('../../utils/request');
-const { login, clearSession, isLoggedIn, ensureLoginWithModal, getToken } = require('../../utils/auth');
+const { login, ensureSession, clearSession, isLoggedIn, ensureLoginWithModal, getToken } = require('../../utils/auth');
 
 Page({
   data: {
@@ -20,6 +20,9 @@ Page({
   onShow() {
     if (!isLoggedIn()) {
       this.setLoggedOutState();
+      ensureSession().then((ok) => {
+        if (ok) this.refresh();
+      });
       return;
     }
     this.refresh();

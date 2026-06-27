@@ -1,9 +1,7 @@
 .page { padding: 24rpx 32rpx; }
-.image-wrap { border-radius: 12rpx; overflow: hidden; margin-bottom: 24rpx; }
-.image-wrap image { width: 100%; }
-.info { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16rpx; }
-.type { font-size: 36rpx; font-weight: 600; color: #222; }
-.date { font-size: 26rpx; color: #888; }
+.info-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16rpx; margin-bottom: 16rpx; }
+.info-main { flex: 1; min-width: 0; }
+.type { display: block; font-size: 36rpx; font-weight: 600; color: #222; line-height: 1.3; }
 .meta { background: #fff; border-radius: 12rpx; padding: 20rpx 24rpx; margin-bottom: 16rpx; }
 .meta-line { display: block; font-size: 26rpx; color: #666; line-height: 1.9; }
 .failed-tip { display: flex; justify-content: space-between; align-items: center; background: #fff7e6; color: #fa8c16; font-size: 26rpx; padding: 16rpx; border-radius: 8rpx; margin-bottom: 16rpx; }
@@ -16,10 +14,13 @@
 .c-ref { flex: 2; text-align: right; color: #999; }
 .m-row.abnormal .c-value { color: #e64340; font-weight: 600; }
 .toolbar { display: flex; justify-content: flex-end; gap: 16rpx; margin-bottom: 16rpx; }
-.tool-btn { padding: 10rpx 28rpx; font-size: 26rpx; border-radius: 8rpx; background: #fff; color: #07c160; border: 1rpx solid #07c160; }
+.tool-btn { padding: 8rpx 24rpx; font-size: 24rpx; line-height: 1.5; border-radius: 999rpx; background: #fff; color: #07c160; border: 1rpx solid #07c160; flex: none; }
 .tool-btn.primary { background: #07c160; color: #fff; }
 .tool-btn.ghost { color: #888; border-color: #ccc; }
 .tool-btn.disabled { opacity: 0.5; }
+.image-entry { margin-top: 20rpx; display: flex; justify-content: flex-start; }
+.image-link { padding: 14rpx 24rpx; border-radius: 999rpx; background: #eefaf4; color: #07c160; font-size: 24rpx; }
+.image-link.disabled { opacity: 0.7; }
 .edit-section { margin-bottom: 20rpx; }
 .field-label { display: block; font-size: 24rpx; color: #666; margin-bottom: 8rpx; }
 .field-input { background: #fff; border-radius: 12rpx; padding: 18rpx; font-size: 26rpx; }

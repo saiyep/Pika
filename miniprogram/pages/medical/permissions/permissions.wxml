@@ -1,26 +1,43 @@
 <view class="page">
-  <view class="tip">你可以设置家庭成员对“我的就医数据”的权限。</view>
-
-  <view wx:if="{{loading}}" class="loading">加载中…</view>
-  <view wx:elif="{{members.length === 0}}" class="empty">暂无可授权成员</view>
-
-  <view wx:for="{{members}}" wx:key="id" class="card">
-    <view class="member-head">
-      <text class="name">{{item.nickname || ('用户' + item.id)}}</text>
-      <text class="role">{{item.family_role === 'admin' ? '管理员' : '普通成员'}}</text>
-    </view>
-
-    <view class="action-row" wx:for="{{item.actionItems}}" wx:key="key">
-      <text class="label">{{item.label}}</text>
-      <switch
-        checked="{{item.checked}}"
-        data-member-id="{{item.id}}"
-        data-action="{{item.key}}"
-        bindchange="onToggleAction"
-        color="#07c160"
-      />
-    </view>
-
-    <button class="save-btn" size="mini" data-member-id="{{item.id}}" bindtap="onSaveMember" loading="{{saving}}" disabled="{{saving}}">保存该成员权限</button>
+  <view class="hero">
+    <view class="hero-title">权限设置</view>
   </view>
+
+  <view wx:if="{{loading}}" class="state-card">加载中…</view>
+  <view wx:elif="{{members.length === 0}}" class="state-card">暂无可授权成员</view>
+
+  <block wx:else>
+    <picker mode="selector" range="{{memberLabels}}" value="{{selectedMemberIndex}}" bindchange="onMemberPick">
+      <view class="member-card member-card-clickable">
+        <view class="member-head">
+          <view class="member-avatar">{{members[selectedMemberIndex].initial}}</view>
+          <view class="member-meta">
+            <view class="member-name">{{memberLabels[selectedMemberIndex] || '请选择成员'}}</view>
+          </view>
+          <text class="picker-arrow">›</text>
+        </view>
+      </view>
+    </picker>
+
+    <view class="permissions-card" wx:if="{{selectedMemberId}}">
+      <view class="section-title">该成员对我的权限</view>
+      <view wx:for="{{actionOptions}}" wx:key="key" class="permission-row">
+        <view class="permission-copy">
+          <view class="permission-label">{{item.label}}</view>
+          <view class="permission-desc">{{item.key === 'view_report' ? '可查看我的检查记录与详情' : item.key === 'upload_for_owner' ? '可帮我上传新的检查单' : item.key === 'edit_report' ? '可修改报告内容与信息' : '可移除已有报告记录'}}</view>
+        </view>
+        <switch
+          checked="{{draftActions.indexOf(item.key) >= 0}}"
+          data-action="{{item.key}}"
+          bindchange="onToggleAction"
+          color="#07c160"
+        />
+      </view>
+    </view>
+
+    <view class="bottom-bar" wx:if="{{selectedMemberId}}">
+      <button class="act ghost" bindtap="onCancelMember" disabled="{{saving}}">取消</button>
+      <button class="act primary" bindtap="onSaveMember" loading="{{saving}}" disabled="{{saving}}">保存</button>
+    </view>
+  </block>
 </view>
