@@ -5,8 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Read first
 
 Before coding, read:
-- `docs/PROJECT_STATUS.md` (current truth, progress, blockers, next steps)
-- `docs/IMPLEMENTATION_PLAN.md` (current implementation scope and execution order)
+- `docs/PROJECT_STATUS.md` (global dashboard: current truth, phase, backlog overview)
+- `docs/IMPLEMENTATION_PLAN.md` (current implementation scope, shared acceptance, cross-ticket order)
+
+If the work maps to a specific feature / bug ticket, also read the corresponding file under `docs/tickets/` before editing code or docs.
 
 ## Project scope (current)
 
@@ -112,3 +114,10 @@ alembic stamp head    # ONLY the first time, on the pre-existing NAS DB
 
 - DevTools must enable “不校验合法域名” for LAN HTTP POC.
 - `miniprogram/project.config.json` still requires a real AppID before full device flow.
+
+## Documentation workflow
+
+- `docs/PROJECT_STATUS.md` is the high-level dashboard only; keep it short.
+- `docs/IMPLEMENTATION_PLAN.md` keeps scope, shared acceptance criteria, and cross-ticket execution bundles.
+- `docs/tickets/TICKET_TEMPLATE.md` is the template for new tracked work items.
+- For any feature / bug expected to span multiple loops, create or update one `docs/tickets/TKT-xxx-*.md` file and treat that ticket as the working unit.

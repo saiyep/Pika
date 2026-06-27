@@ -8,62 +8,39 @@
 
 ## 现场反馈评估（2026-06-25）
 
-1. 自动微信登录（免手动点“我”）
-   - 原因：当前登录入口主要在“我”页手动触发。
-   - 难度：中。
-   - 优先级：P0。
+- 本轮反馈已拆成 ticket；全局只保留优先级与状态，总细节转移到 `docs/tickets/`。
+- 当前 active backlog 以 P0 / P1 为主，每个 loop 尽量只推进一个 ticket。
+- 已完成项“趋势图增加标准化网格刻度 + 新增数据表视图”不再单列 backlog，后续如需返工再新开 ticket。
 
-2. 家人上传后你看不到她的记录
-   - 原因：现有 ACL 设计按 owner 授权，不是默认全家可见；需在“权限设置”里显式授权 `view_report`。
-   - 难度：低（产品引导）/中（做默认授权策略）。
-   - 优先级：P0（先做引导与默认策略评估）。
+## Backlog 总览（高层入口）
 
-3. 不同医院指标名不统一导致趋势碎片化；改为“个人关注指标 + 识别时按关注过滤”，并优先自动识别医院，识别不出再让用户手选
-   - 原因：当前 catalog/trend 直接按 `item_code/item_name` 聚合，无同义词归一；上传页医院字段仍以人工选择/输入为主，自动识别未作为主路径。
-   - 难度：高（涉及模型提示、数据库模型、上传流程、权限页 UI、医院识别回填策略）。
-   - 优先级：P1（与检查单分类一起做 MVP）。
+> 规则：`PROJECT_STATUS.md` 只做看板；单项背景、范围、验收、阻塞、loop 记录统一写到 `docs/tickets/*.md`。
 
-4. 上传识别/提交失败时按钮自动重试 2 次并提示“重试中”
-   - 原因：上传与提交现在大多单次请求，失败即 toast。
-   - 难度：中。
-   - 优先级：P0。
+### Active backlog（已建 ticket）
 
-5. 趋势图增加标准化网格刻度 + 新增数据表视图（默认表格，可切换趋势）
-   - 原因：当前图只画 min/max，信息密度不足且易误读。
-   - 难度：中-高（前端图形重构 + 新列表接口/字段复用）。
-   - 优先级：已完成。
+| 优先级 | 状态 | ID | 标题 | 明细 |
+| --- | --- | --- | --- | --- |
+| P0 | todo | TKT-001 | 自动微信登录体验改造 | `docs/tickets/TKT-001-auto-wechat-login.md` |
+| P0 | todo | TKT-002 | 上传识别与提交自动重试反馈 | `docs/tickets/TKT-002-upload-retry-feedback.md` |
+| P0 | todo | TKT-003 | 上传成功后导航回流优化 | `docs/tickets/TKT-003-post-submit-navigation.md` |
+| P0 | todo | TKT-004 | 家人记录不可见的权限提示与策略评估 | `docs/tickets/TKT-004-family-visibility-guidance.md` |
+| P0 | todo | TKT-005 | 扫码加入闭环真机验收 | `docs/tickets/TKT-005-invite-join-device-validation.md` |
+| P1 | todo | TKT-006 | 关注指标体系与医院自动识别主路径 | `docs/tickets/TKT-006-focus-metrics-and-hospital-recognition.md` |
+| P1 | todo | TKT-007 | 检查单类别识别与关注指标联动 | `docs/tickets/TKT-007-report-category-recognition.md` |
+| P1 | todo | TKT-008 | 就医浏览体验真机验收与交互微调 | `docs/tickets/TKT-008-medical-browsing-device-polish.md` |
 
-6. 识别检查单类别（血常规/尿常规/肝肾功/肿瘤标志物/甲功）并按类别关注指标
-   - 原因：当前 `report_type` 粒度较粗，未绑定你们定义的 5 类与指标集合。
-   - 难度：高（识别策略 + 配置模型 + 存储与编辑）。
-   - 优先级：P1（与 #3 联动设计）。
+### 候选池（未升格成 active ticket）
 
-7. 上传提交后返回路径优化（回主页面或历史页）
-   - 原因：当前提交成功后固定 `navigateTo(report-detail)`，返回栈层级偏深。
-   - 难度：低。
-   - 优先级：P0。
+- P2：AI 助手能力迭代。
+- P2：更多报告类型适配与指标标准化词典完善。
 
-## Backlog（唯一入口）
-
-### P0（当前必须先做）
-1. 自动登录体验改造（启动后自动触发微信登录，失败再回退手动登录）。
-2. 上传识别与提交按钮增加“重试中”状态与最多 2 次自动重试。
-3. 上传成功后的导航优化：明细页提供“回就医首页/历史”，或调整返回栈。
-4. 权限可见性优化：给“看不到家人记录”增加前端提示与默认授权策略评估。
-5. 完成小程序内扫码加入闭环真机验收（含失败提示）。
-
-### P1（P0 完成后）
-1. 关注指标体系（个人可配置）+ 识别按关注指标过滤（MVP），并将医院识别作为默认主路径，识别失败时再回退人工选择。
-2. 检查单类别识别（5 类）并与关注指标联动。
-3. 就医浏览体验继续收口：趋势/历史页的真机验收与交互微调。
-
-### P2（后续功能）
-1. AI 助手能力迭代。
-2. 更多报告类型适配与指标标准化词典完善。
-
+进入 active backlog 前，先按 `docs/tickets/TICKET_TEMPLATE.md` 建 ticket，再回写到上表。
 ## 关键约定（维持）
 
-- `PROJECT_STATUS.md` 是 backlog 唯一入口；新会话优先读取本文件。
+- `PROJECT_STATUS.md` 是全局高层入口；单项 backlog 明细写在 `docs/tickets/*.md`。
+- 新会话先读 `PROJECT_STATUS.md`，再按当前目标跳转对应 ticket。
+- 新 feature / bug 若会跨多个 loop，先按 `docs/tickets/TICKET_TEMPLATE.md` 建 ticket。
+- `IMPLEMENTATION_PLAN.md` 只保留范围、共享验收口径、跨 ticket 实施包，不承载单项过程记录。
 - DB 由 Alembic 管理；改 models 后 `alembic revision --autogenerate`。
 - 改 backend 代码须 **rebuild**（重启不够）；改挂载须同步 NAS `docker-compose.yaml`。
 - 流程：先 release→模拟器/真机验证→再 commit；push 前检查敏感公网标识不入仓库。
