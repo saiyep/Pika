@@ -1,0 +1,4 @@
+.page { padding: 32rpx; }
+.card { background: #fff; border-radius: 16rpx; padding: 32rpx; }
+.title { display: block; font-size: 32rpx; color: #222; font-weight: 600; }
+.desc { display: block; margin-top: 12rpx; font-size: 26rpx; color: #888; }
