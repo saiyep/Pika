@@ -137,6 +137,13 @@ Page({
     this.setData({ reportTypeLabel: e.detail.value || '' });
   },
 
+  setUploadProgress(next) {
+    const current = this.data.uploadProgress || 0;
+    const target = Math.max(0, Math.min(100, Number(next) || 0));
+    const monotonic = Math.max(current, target);
+    if (monotonic !== current) this.setData({ uploadProgress: monotonic });
+  },
+
   createDraft() {
     if (!this.data.files.length || this.data.uploading) return;
     const token = getApp().globalData.token || wx.getStorageSync('token') || '';
@@ -155,12 +162,12 @@ Page({
       this.setData({
         uploading: true,
         uploadRetrying: false,
-        uploadProgress: 8,
         uploadStageText: '正在上传图片并识别检查项，请稍候…',
       });
+      this.setUploadProgress(8);
       progressTimer = setInterval(() => {
         const next = Math.min(90, (this.data.uploadProgress || 0) + 6);
-        this.setData({ uploadProgress: next });
+        this.setUploadProgress(next);
       }, 800);
     };
     const stopProgress = () => {
@@ -212,7 +219,8 @@ Page({
       }),
     })
       .then((all) => {
-        this.setData({ uploadProgress: 100, uploadStageText: '识别完成，正在整理结果…' });
+        this.setUploadProgress(100);
+        this.setData({ uploadStageText: '识别完成，正在整理结果…' });
         const first = all[0];
         const enterEdit = () => {
           this.setData({

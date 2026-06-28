@@ -1,6 +1,7 @@
 <view class="page">
   <view class="logo">Pika</view>
   <text class="version">版本 {{version}}</text>
+  <text class="version">前端 MD5 {{frontendMd5}}</text>
   <text class="tagline">家庭服务平台</text>
 
   <view class="section">

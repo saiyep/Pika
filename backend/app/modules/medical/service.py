@@ -353,26 +353,19 @@ def set_acl_grant(
             db.add(grant)
         else:
             grant.actions_json = clean
-    else:
-        if grant is None:
-            grant = MedicalAclGrant(
-                owner_user_id=owner_user_id,
-                grantee_user_id=grantee_user_id,
-                actions_json=[],
-            )
-            db.add(grant)
-        else:
-            db.delete(grant)
-            db.commit()
-            return MedicalAclGrant(
-                owner_user_id=owner_user_id,
-                grantee_user_id=grantee_user_id,
-                actions_json=[],
-            )
+        db.commit()
+        db.refresh(grant)
+        return grant
 
-    db.commit()
-    db.refresh(grant)
-    return grant
+    if grant is not None:
+        db.delete(grant)
+        db.commit()
+
+    return MedicalAclGrant(
+        owner_user_id=owner_user_id,
+        grantee_user_id=grantee_user_id,
+        actions_json=sorted(MEDICAL_ACTIONS),
+    )
 
 
 def list_acl_grants(db: Session, *, owner_user_id: int) -> list[MedicalAclGrant]:
@@ -407,5 +400,8 @@ def has_acl_action(
         .first()
     )
     if not grant:
-        return False
-    return action in (grant.actions_json or [])
+        return True
+    actions = grant.actions_json or []
+    if not actions:
+        return True
+    return action in actions

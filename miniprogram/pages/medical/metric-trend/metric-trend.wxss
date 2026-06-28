@@ -1,15 +1,17 @@
-.page { padding: 24rpx 32rpx; background: #f6f7f9; min-height: 100vh; box-sizing: border-box; }
+.page { padding: 24rpx 28rpx 160rpx; background: #f6f7f9; min-height: 100vh; box-sizing: border-box; }
 .hero { margin-bottom: 20rpx; }
 .hero-title { display: block; font-size: 36rpx; font-weight: 600; color: #222; }
 .hero-subtitle { display: block; margin-top: 8rpx; font-size: 24rpx; color: #888; }
-.select-card, .content-card, .state-card { background: #fff; border-radius: 18rpx; padding: 24rpx; margin-bottom: 20rpx; box-shadow: 0 6rpx 18rpx rgba(0, 0, 0, 0.04); }
-.state-card { text-align: center; color: #999; font-size: 28rpx; padding: 48rpx 24rpx; }
-.section-title { display: block; font-size: 28rpx; font-weight: 600; color: #222; margin-bottom: 16rpx; }
-.section-tip { display: block; margin-top: 12rpx; font-size: 22rpx; color: #999; }
+.filter-stack { display: flex; flex-direction: column; gap: 16rpx; margin-bottom: 20rpx; }
+.select-card, .content-card, .state-card { background: #fff; border-radius: 18rpx; padding: 24rpx; box-shadow: 0 6rpx 18rpx rgba(0, 0, 0, 0.04); }
+.select-card { padding: 16rpx 20rpx; }
+.state-card { text-align: center; color: #999; font-size: 28rpx; padding: 48rpx 24rpx; margin-bottom: 20rpx; }
 .state-inline { background: #f7f7f7; border-radius: 12rpx; padding: 24rpx 18rpx; font-size: 24rpx; color: #999; }
 .picker-row { background: #f7f7f7; border-radius: 12rpx; padding: 18rpx; display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
-.picker-label { font-size: 26rpx; color: #666; }
+.single-line-row { padding-top: 14rpx; padding-bottom: 14rpx; }
+.picker-label { flex-shrink: 0; font-size: 26rpx; color: #666; }
 .picker-value { font-size: 26rpx; color: #07c160; text-align: right; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.custom-inline { display: flex; flex-direction: column; gap: 10rpx; margin-top: 10rpx; }
 .content-title { display: block; font-size: 30rpx; font-weight: 600; margin-bottom: 16rpx; color: #222; }
 .view-switch { display: inline-flex; margin-bottom: 20rpx; padding: 6rpx; background: #f5f5f5; border-radius: 999rpx; }
 .switch-item { min-width: 132rpx; padding: 12rpx 24rpx; text-align: center; font-size: 24rpx; color: #666; border-radius: 999rpx; }
@@ -32,3 +34,4 @@
 .legend-band, .legend-dot { font-size: 22rpx; color: #999; }
 .chart-note { margin-top: 12rpx; font-size: 22rpx; color: #fa8c16; }
 .empty-inline { text-align: center; color: #999; padding: 80rpx 0 56rpx; font-size: 26rpx; }
+@media (max-width: 360px) { .filter-stack { gap: 12rpx; } }

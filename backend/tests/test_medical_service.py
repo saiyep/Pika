@@ -387,7 +387,10 @@ def test_medical_acl_actions(db_session, user):
     db_session.commit()
 
     assert service.has_acl_action(db_session, actor_user_id=user.id, owner_user_id=user.id, action="view_report") is True
-    assert service.has_acl_action(db_session, actor_user_id=spouse.id, owner_user_id=user.id, action="view_report") is False
+    assert service.has_acl_action(db_session, actor_user_id=spouse.id, owner_user_id=user.id, action="view_report") is True
+    assert service.has_acl_action(db_session, actor_user_id=spouse.id, owner_user_id=user.id, action="upload_for_owner") is True
+    assert service.has_acl_action(db_session, actor_user_id=spouse.id, owner_user_id=user.id, action="edit_report") is True
+    assert service.has_acl_action(db_session, actor_user_id=spouse.id, owner_user_id=user.id, action="delete_report") is True
 
     service.set_acl_grant(
         db_session,
@@ -451,8 +454,8 @@ def test_metric_trend_marks_mixed_reference_ranges(db_session, user, tmp_upload,
 
     assert out.data is not None
     assert out.data.has_mixed_reference is True
-    assert out.data.ref_low is None
-    assert out.data.ref_high is None
+    assert out.data.ref_low == 3.5
+    assert out.data.ref_high == 9.5
     assert len(out.data.points) == 2
     assert out.data.points[0].value_text is not None
     assert out.data.points[0].ref_range is not None
@@ -511,4 +514,26 @@ def test_medical_acl_requires_same_family(db_session, user):
         actions=["view_report"],
     )
     assert service.has_acl_action(db_session, actor_user_id=outsider.id, owner_user_id=user.id, action="view_report") is False
+
+
+def test_empty_acl_record_is_treated_as_default_allow(db_session, user):
+    spouse = User(openid="spouse-empty-acl", nickname="爱人", role="member", account_type="wechat", status="active")
+    db_session.add(spouse)
+    db_session.commit()
+    db_session.refresh(spouse)
+
+    owner_m = user_service.get_active_membership(db_session, user_id=user.id)
+    assert owner_m is not None
+    db_session.add(FamilyMembership(family_id=owner_m.family_id, user_id=spouse.id, family_role="member", is_active=True))
+    db_session.commit()
+
+    grant = service.set_acl_grant(
+        db_session,
+        owner_user_id=user.id,
+        grantee_user_id=spouse.id,
+        actions=[],
+    )
+    assert set(grant.actions_json or []) == set(service.MEDICAL_ACTIONS)
+    assert service.has_acl_action(db_session, actor_user_id=spouse.id, owner_user_id=user.id, action="view_report") is True
+    assert service.has_acl_action(db_session, actor_user_id=spouse.id, owner_user_id=user.id, action="upload_for_owner") is True
 

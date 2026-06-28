@@ -7,28 +7,51 @@
   <view wx:if="{{membersLoading}}" class="state-card">加载成员中…</view>
   <view wx:elif="{{members.length === 0}}" class="state-card">暂无可查看成员</view>
   <block wx:else>
-    <view class="select-card">
-      <text class="section-title">成员</text>
-      <picker mode="selector" range="{{memberLabels}}" value="{{selectedMemberIndex}}" bindchange="onMemberPick">
-        <view class="picker-row">
-          <text class="picker-label">查看成员</text>
-          <text class="picker-value">{{memberLabels[selectedMemberIndex]}} ▾</text>
+    <view class="filter-stack">
+      <view class="select-card">
+        <picker mode="selector" range="{{memberLabels}}" value="{{selectedMemberIndex}}" bindchange="onMemberPick">
+          <view class="picker-row single-line-row">
+            <text class="picker-label">成员</text>
+            <text class="picker-value">{{memberDisplay}} ▾</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="select-card">
+        <picker mode="selector" range="{{timeRanges}}" value="{{timeIndex}}" bindchange="onTimePick">
+          <view class="picker-row single-line-row">
+            <text class="picker-label">时间范围</text>
+            <text class="picker-value">{{timeDisplay}} ▾</text>
+          </view>
+        </picker>
+        <view wx:if="{{showCustom}}" class="custom-inline">
+          <picker mode="date" value="{{customFrom}}" bindchange="onCustomFrom">
+            <view class="picker-row single-line-row">
+              <text class="picker-label">起始日期</text>
+              <text class="picker-value">{{customFrom || '请选择'}} ▾</text>
+            </view>
+          </picker>
+          <picker mode="date" value="{{customTo}}" bindchange="onCustomTo">
+            <view class="picker-row single-line-row">
+              <text class="picker-label">结束日期</text>
+              <text class="picker-value">{{customTo || '请选择'}} ▾</text>
+            </view>
+          </picker>
         </view>
-      </picker>
-      <text class="section-tip">趋势仅支持单个成员查看</text>
+      </view>
+
+      <view class="select-card">
+        <view wx:if="{{catalogLoading}}" class="state-inline">正在加载该成员的指标…</view>
+        <view wx:elif="{{catalog.length === 0}}" class="state-inline">该成员暂无可展示指标，请先上传检查单</view>
+        <picker wx:else mode="selector" range="{{catalogLabels}}" value="{{selectedIndex}}" bindchange="onPick">
+          <view class="picker-row single-line-row">
+            <text class="picker-label">指标</text>
+            <text class="picker-value">{{catalog[selectedIndex].item_name}} ▾</text>
+          </view>
+        </picker>
+      </view>
     </view>
 
-    <view class="select-card" wx:if="{{selectedMemberId}}">
-      <text class="section-title">指标</text>
-      <view wx:if="{{catalogLoading}}" class="state-inline">正在加载该成员的指标…</view>
-      <view wx:elif="{{catalog.length === 0}}" class="state-inline">该成员暂无可展示指标，请先上传检查单</view>
-      <picker wx:else mode="selector" range="{{catalogLabels}}" value="{{selectedIndex}}" bindchange="onPick">
-        <view class="picker-row">
-          <text class="picker-label">选择指标</text>
-          <text class="picker-value">{{catalog[selectedIndex].item_name}} ▾</text>
-        </view>
-      </picker>
-    </view>
 
     <view wx:if="{{trendLoading}}" class="state-card">正在加载趋势数据…</view>
 
@@ -59,7 +82,7 @@
 
       <block wx:else>
         <view wx:if="{{chartPointsCount > 0}}" class="chart-wrap">
-          <canvas type="2d" id="trendCanvas" class="chart" bindtap="onChartTap"></canvas>
+          <canvas type="2d" id="trendCanvas" class="chart" bindtap="onChartTap" bindtouchend="onChartTouch"></canvas>
           <view wx:if="{{activeTooltip}}" class="chart-tooltip" style="left: {{activeTooltip.left}}px; top: {{activeTooltip.top}}px;">
             <text class="tooltip-date">{{activeTooltip.displayDate}}</text>
             <text class="tooltip-value">{{activeTooltip.displayValue}}</text>

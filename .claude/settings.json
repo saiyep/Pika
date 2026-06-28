@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=$(jq -r '.tool_input.file_path // .tool_response.filePath // empty'); case \"$p\" in *miniprogram/*) ;; *) exit 0 ;; esac; h=$(git ls-files \"miniprogram\" \":!miniprogram/pages/about/about.js\" | sort | xargs cat | md5sum | cut -c1-8); perl -0777 -i -pe \"s/frontendMd5: '[0-9a-f]{8}'/frontendMd5: '$h'/\" miniprogram/pages/about/about.js"
+          }
+        ]
+      }
+    ]
+  }
+}

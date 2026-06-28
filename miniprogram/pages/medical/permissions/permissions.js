@@ -7,6 +7,15 @@ const ACTIONS = [
   { key: 'delete_report', label: '可删除我的报告' },
 ];
 
+function normalizeActions(actions) {
+  return Array.isArray(actions) && actions.length ? actions : ACTIONS.map((a) => a.key);
+}
+
+function buildActionOptions(actions) {
+  const picked = new Set(normalizeActions(actions));
+  return ACTIONS.map((a) => ({ ...a, checked: picked.has(a.key) }));
+}
+
 Page({
   data: {
     loading: false,
@@ -18,7 +27,7 @@ Page({
     selectedMemberId: null,
     draftActions: [],
     originalActions: [],
-    actionOptions: ACTIONS,
+    actionOptions: buildActionOptions(ACTIONS.map((a) => a.key)),
   },
 
   onShow() {
@@ -27,15 +36,17 @@ Page({
 
   loadData() {
     this.setData({ loading: true });
-    Promise.all([
+    Promise.allSettled([
       request({ url: '/api/user/members' }),
       request({ url: '/api/medical/permissions' }),
     ])
-      .then(([membersData, aclData]) => {
+      .then(([membersRes, aclRes]) => {
+        const membersData = membersRes.status === 'fulfilled' ? membersRes.value : { items: [] };
+        const aclData = aclRes.status === 'fulfilled' ? aclRes.value : { grants: [] };
         const ownerUserId = Number((aclData && aclData.owner_user_id) || 0);
         const grantsMap = {};
         (aclData.grants || []).forEach((g) => {
-          grantsMap[Number(g.grantee_user_id)] = g.actions || [];
+          grantsMap[Number(g.grantee_user_id)] = normalizeActions(g.actions);
         });
 
         const members = (membersData.items || [])
@@ -50,7 +61,14 @@ Page({
         const selectedMemberIndex = 0;
         const selectedMember = members[selectedMemberIndex] || null;
         const selectedMemberId = selectedMember ? selectedMember.id : null;
-        const selectedActions = selectedMemberId ? (grantsMap[selectedMemberId] || []) : [];
+        const selectedActions = selectedMemberId ? (grantsMap[selectedMemberId] || ACTIONS.map((a) => a.key)) : [];
+
+        if (membersRes.status === 'rejected' || aclRes.status === 'rejected') {
+          console.log('load permissions partial failure', {
+            membersOk: membersRes.status === 'fulfilled',
+            aclOk: aclRes.status === 'fulfilled',
+          });
+        }
 
         this.setData({
           members,
@@ -60,9 +78,11 @@ Page({
           selectedMemberId,
           draftActions: [...selectedActions],
           originalActions: [...selectedActions],
+          actionOptions: buildActionOptions(selectedActions),
         });
       })
-      .catch(() => {
+      .catch((err) => {
+        console.log('load permissions failed', err);
         wx.showToast({ title: '加载失败', icon: 'none' });
       })
       .finally(() => {
@@ -74,12 +94,13 @@ Page({
     const selectedMemberIndex = Number(e.detail.value);
     const member = this.data.members[selectedMemberIndex] || null;
     const memberId = member ? Number(member.id) : null;
-    const actions = memberId ? (this.data.grants[memberId] || []) : [];
+    const actions = memberId ? normalizeActions(this.data.grants[memberId]) : [];
     this.setData({
       selectedMemberIndex,
       selectedMemberId: memberId,
       draftActions: [...actions],
       originalActions: [...actions],
+      actionOptions: buildActionOptions(actions),
     });
   },
 
@@ -89,11 +110,13 @@ Page({
     const current = new Set(this.data.draftActions || []);
     if (checked) current.add(action);
     else current.delete(action);
-    this.setData({ draftActions: Array.from(current) });
+    const draftActions = Array.from(current);
+    this.setData({ draftActions, actionOptions: buildActionOptions(draftActions) });
   },
 
   onCancelMember() {
-    this.setData({ draftActions: [...this.data.originalActions] });
+    const actions = [...this.data.originalActions];
+    this.setData({ draftActions: actions, actionOptions: buildActionOptions(actions) });
   },
 
   onSaveMember() {
@@ -111,6 +134,7 @@ Page({
         this.setData({
           grants,
           originalActions: [...actions],
+          actionOptions: buildActionOptions(actions),
         });
         wx.showToast({ title: '已保存', icon: 'success' });
       })

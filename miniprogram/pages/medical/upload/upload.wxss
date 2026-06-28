@@ -2,16 +2,16 @@
 .hero { margin-bottom: 20rpx; }
 .hero-title { font-size: 36rpx; font-weight: 700; color: #222; margin-bottom: 10rpx; }
 .hero-subtitle { font-size: 24rpx; color: #666; line-height: 1.6; }
-.card { background: #fff; border-radius: 18rpx; padding: 24rpx; margin-bottom: 20rpx; box-shadow: 0 6rpx 18rpx rgba(0,0,0,0.04); }
+.select-card { background: #fff; border-radius: 18rpx; padding: 24rpx; margin-bottom: 20rpx; box-shadow: 0 6rpx 18rpx rgba(0,0,0,0.04); }
+.summary-card { padding-bottom: 18rpx; }
 .section { margin-bottom: 20rpx; }
 .section.mini { margin: 16rpx 0 0; }
-.section-title { display: block; font-size: 24rpx; color: #666; margin-bottom: 12rpx; }
+.section-title { display: block; font-size: 28rpx; font-weight: 600; color: #222; margin-bottom: 16rpx; }
 .input { background: #f7f7f7; border-radius: 12rpx; padding: 18rpx; font-size: 26rpx; }
 .input + .input { margin-top: 10rpx; }
-.picker-row { background: #f7f7f7; border-radius: 12rpx; padding: 18rpx; display: flex; align-items: center; }
-.picker-label { font-size: 26rpx; color: #999; margin-right: 18rpx; }
-.picker-value { flex: 1; font-size: 28rpx; color: #333; }
-.picker-arrow { font-size: 30rpx; color: #999; }
+.picker-row { background: #f7f7f7; border-radius: 12rpx; padding: 18rpx; display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.picker-label { font-size: 26rpx; color: #666; }
+.picker-value { flex: 1; font-size: 26rpx; color: #07c160; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .upload-dropzone { border: 2rpx dashed #d9e2dc; border-radius: 16rpx; padding: 40rpx 24rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fafcfb; }
 .upload-icon { width: 72rpx; height: 72rpx; border-radius: 36rpx; background: #e7f9ef; color: #07c160; display: flex; align-items: center; justify-content: center; font-size: 44rpx; margin-bottom: 16rpx; }
 .upload-title { font-size: 30rpx; font-weight: 600; color: #222; margin-bottom: 8rpx; }
@@ -39,7 +39,6 @@
 .progress-desc { font-size: 24rpx; color: #666; line-height: 1.6; margin-bottom: 12rpx; }
 .progress-number { font-size: 28rpx; color: #07c160; font-weight: 600; margin-bottom: 10rpx; }
 .progress-hint { font-size: 22rpx; color: #999; margin-top: 12rpx; }
-.summary-card { padding-bottom: 18rpx; }
 .summary-hint { font-size: 22rpx; color: #999; line-height: 1.6; margin-bottom: 14rpx; }
 .required { color: #d93025; }
 .summary-row { display: flex; align-items: center; justify-content: space-between; padding: 12rpx 0; border-bottom: 1rpx solid #f3f3f3; }

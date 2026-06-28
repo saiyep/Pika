@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-- 主线阶段：体验版稳定性回归 + 就医浏览体验重构后的真机验收。
-- 已落地：趋势页改为单成员优先浏览；历史页默认本人 + 近 3 个月 + 医院多选；上传页与权限设置页 UI/UX 已重构；登录/请求基础设施也做了对应收口。
+- 主线阶段：体验版稳定性回归完成，进入下一轮能力升级准备。
+- 已落地：趋势页改为单成员优先浏览；历史页默认本人 + 近 3 个月 + 医院结果联动筛选；上传页与权限设置页 UI/UX 已重构；登录/请求基础设施与版本校验也做了对应收口。
 - 部署状态：后端已发布到 NAS，Alembic 版本 `d5a9e1c7b2f4`；本轮后端改动不需要重建数据库。
 
 ## 现场反馈评估（2026-06-25）
@@ -20,21 +20,28 @@
 
 | 优先级 | 状态 | ID | 标题 | 明细 |
 | --- | --- | --- | --- | --- |
-| P0 | doing | TKT-001 | 自动微信登录体验改造 | `docs/tickets/TKT-001-auto-wechat-login.md` |
+| P0 | done | TKT-001 | 自动微信登录体验改造 | `docs/tickets/TKT-001-auto-wechat-login.md` |
+| P0 | done | TKT-003 | 上传成功后导航回流优化 | `docs/tickets/TKT-003-post-submit-navigation.md` |
+| P0 | done | TKT-004 | 就医权限默认未向家庭成员全开 | `docs/tickets/TKT-004-family-visibility-guidance.md` |
+| P0 | done | TKT-005 | 扫码加入闭环真机验收 | `docs/tickets/TKT-005-invite-join-device-validation.md` |
 | P0 | done | TKT-002 | 上传识别与提交自动重试反馈 | `docs/tickets/TKT-002-upload-retry-feedback.md` |
-| P0 | todo | TKT-003 | 上传成功后导航回流优化 | `docs/tickets/TKT-003-post-submit-navigation.md` |
-| P0 | todo | TKT-004 | 就医权限默认未向家庭成员全开 | `docs/tickets/TKT-004-family-visibility-guidance.md` |
-| P0 | todo | TKT-010 | 就医成员选择器 UI/UX 与权限联动统一 | `docs/tickets/TKT-010-unified-member-filter-ux.md` |
+| P0 | done | TKT-003 | 上传成功后导航回流优化 | `docs/tickets/TKT-003-post-submit-navigation.md` |
+| P0 | done | TKT-004 | 就医权限默认未向家庭成员全开 | `docs/tickets/TKT-004-family-visibility-guidance.md` |
+| P0 | done | TKT-010 | 就医成员选择器 UI/UX 与权限联动统一 | `docs/tickets/TKT-010-unified-member-filter-ux.md` |
 | P1 | todo | TKT-006 | 关注指标体系与医院自动识别主路径 | `docs/tickets/TKT-006-focus-metrics-and-hospital-recognition.md` |
 | P1 | todo | TKT-007 | 检查单类别识别与关注指标联动 | `docs/tickets/TKT-007-report-category-recognition.md` |
-| P1 | todo | TKT-008 | 就医浏览体验真机验收与交互微调 | `docs/tickets/TKT-008-medical-browsing-device-polish.md` |
-| P1 | todo | TKT-009 | 趋势图点按缺少数值 tooltip | `docs/tickets/TKT-009-trend-point-tooltip.md` |
+| P1 | done | TKT-008 | 就医浏览体验真机验收与交互微调 | `docs/tickets/TKT-008-medical-browsing-device-polish.md` |
+| P0 | done | TKT-009 | 趋势图点按缺少数值 tooltip | `docs/tickets/TKT-009-trend-point-tooltip.md` |
 
 ### 已完成 / 已验收
 
 | 优先级 | 状态 | ID | 标题 | 明细 |
 | --- | --- | --- | --- | --- |
+| P0 | done | TKT-003 | 上传成功后导航回流优化 | `docs/tickets/TKT-003-post-submit-navigation.md` |
+| P0 | done | TKT-004 | 就医权限默认未向家庭成员全开 | `docs/tickets/TKT-004-family-visibility-guidance.md` |
 | P0 | done | TKT-005 | 扫码加入闭环真机验收 | `docs/tickets/TKT-005-invite-join-device-validation.md` |
+| P0 | done | TKT-009 | 趋势图点按缺少数值 tooltip | `docs/tickets/TKT-009-trend-point-tooltip.md` |
+| P0 | done | TKT-010 | 就医成员选择器 UI/UX 与权限联动统一 | `docs/tickets/TKT-010-unified-member-filter-ux.md` |
 
 ### 候选池（未升格成 active ticket）
 

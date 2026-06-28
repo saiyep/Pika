@@ -1,6 +1,23 @@
 const { request } = require('../../../utils/request');
 
 const PALETTE = ['#07c160', '#4b8bf4', '#fa8c16', '#a64dff', '#13c2c2'];
+const TIME_RANGES = ['过去1个月', '过去3个月', '过去半年', '过去1年', '自定义'];
+const DEFAULT_TIME_INDEX = 1;
+const CUSTOM_INDEX = TIME_RANGES.length - 1;
+
+function pad(n) {
+  return n < 10 ? '0' + n : '' + n;
+}
+
+function ymd(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function monthsAgo(n) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - n);
+  return ymd(d);
+}
 
 Page({
   data: {
@@ -8,6 +25,7 @@ Page({
     memberLabels: [],
     selectedMemberIndex: 0,
     selectedMemberId: null,
+    memberDisplay: '选择成员',
     membersLoading: true,
     catalogLoading: false,
     trendLoading: false,
@@ -19,7 +37,77 @@ Page({
     chartPointsCount: 0,
     viewMode: 'table',
     activeTooltip: null,
+    timeRanges: TIME_RANGES,
+    timeIndex: DEFAULT_TIME_INDEX,
+    timeDisplay: TIME_RANGES[DEFAULT_TIME_INDEX],
+    customFrom: '',
+    customTo: '',
+    showCustom: false,
   },
+
+  formatMemberDisplay(memberLabels, selectedMemberIndex) {
+    return memberLabels.length ? (memberLabels[selectedMemberIndex] || '选择成员') : '选择成员';
+  },
+
+  formatTimeDisplay(timeIndex, customFrom, customTo, timeRanges) {
+    if (timeIndex === CUSTOM_INDEX) {
+      if (customFrom && customTo) return `${customFrom} 至 ${customTo}`;
+      if (customFrom) return `${customFrom} 起`;
+      if (customTo) return `截至 ${customTo}`;
+      return '自定义';
+    }
+    return timeRanges[timeIndex] || TIME_RANGES[DEFAULT_TIME_INDEX];
+  },
+
+  refreshDisplay(partial = {}) {
+    const memberLabels = partial.memberLabels || this.data.memberLabels;
+    const selectedMemberIndex = partial.selectedMemberIndex !== undefined ? partial.selectedMemberIndex : this.data.selectedMemberIndex;
+    const timeRanges = partial.timeRanges || this.data.timeRanges;
+    const timeIndex = partial.timeIndex !== undefined ? partial.timeIndex : this.data.timeIndex;
+    const customFrom = partial.customFrom !== undefined ? partial.customFrom : this.data.customFrom;
+    const customTo = partial.customTo !== undefined ? partial.customTo : this.data.customTo;
+    return {
+      memberDisplay: this.formatMemberDisplay(memberLabels, selectedMemberIndex),
+      timeDisplay: this.formatTimeDisplay(timeIndex, customFrom, customTo, timeRanges),
+    };
+  },
+
+  currentDateRange() {
+    const ti = this.data.timeIndex;
+    if (ti >= 0 && ti <= 3) {
+      const map = { 0: 1, 1: 3, 2: 6, 3: 12 };
+      return { date_from: monthsAgo(map[ti]), date_to: '' };
+    }
+    if (ti === CUSTOM_INDEX) {
+      return { date_from: this.data.customFrom || '', date_to: this.data.customTo || '' };
+    }
+    return { date_from: '', date_to: '' };
+  },
+
+  onTimePick(e) {
+    const idx = Number(e.detail.value);
+    const next = { timeIndex: idx, showCustom: idx === CUSTOM_INDEX };
+    this.setData({ ...next, ...this.refreshDisplay(next) }, () => this.loadCatalog());
+  },
+
+  onCustomFrom(e) {
+    const next = { customFrom: e.detail.value };
+    this.setData({ ...next, ...this.refreshDisplay(next) }, () => this.loadCatalog());
+  },
+
+  onCustomTo(e) {
+    const next = { customTo: e.detail.value };
+    this.setData({ ...next, ...this.refreshDisplay(next) }, () => this.loadCatalog());
+  },
+
+  catalogQuery() {
+    const range = this.currentDateRange();
+    const parts = [];
+    if (range.date_from) parts.push('date_from=' + encodeURIComponent(range.date_from));
+    if (range.date_to) parts.push('date_to=' + encodeURIComponent(range.date_to));
+    return parts.length ? '&' + parts.join('&') : '';
+  },
+
 
   onLoad() {
     this.chartHitAreas = [];
@@ -35,14 +123,16 @@ Page({
         let idx = members.findIndex((m) => m.id === myId);
         if (idx < 0) idx = members.length ? 0 : -1;
         const selectedMember = idx >= 0 ? members[idx] : null;
+        const memberLabels = members.map((m) => m.nickname || ('用户' + m.id));
+        const next = {
+          members,
+          memberLabels,
+          selectedMemberIndex: idx >= 0 ? idx : 0,
+          selectedMemberId: selectedMember ? selectedMember.id : null,
+          membersLoading: false,
+        };
         this.setData(
-          {
-            members,
-            memberLabels: members.map((m) => m.nickname || ('用户' + m.id)),
-            selectedMemberIndex: idx >= 0 ? idx : 0,
-            selectedMemberId: selectedMember ? selectedMember.id : null,
-            membersLoading: false,
-          },
+          { ...next, ...this.refreshDisplay(next) },
           () => {
             if (selectedMember) this.loadCatalog();
           }
@@ -61,7 +151,7 @@ Page({
     const idx = Number(e.detail.value);
     const member = this.data.members[idx] || null;
     this.chartHitAreas = [];
-    this.setData({
+    const next = {
       selectedMemberIndex: idx,
       selectedMemberId: member ? member.id : null,
       selectedIndex: 0,
@@ -72,7 +162,8 @@ Page({
       chartPointsCount: 0,
       viewMode: 'table',
       activeTooltip: null,
-    }, () => {
+    };
+    this.setData({ ...next, ...this.refreshDisplay(next) }, () => {
       if (member) this.loadCatalog();
     });
   },
@@ -91,10 +182,13 @@ Page({
     wx.navigateTo({ url: '/pages/medical/report-detail/report-detail?id=' + reportId });
   },
 
-  onChartTap(e) {
+  onChartTouch(e) {
     if (!this.chartHitAreas || !this.chartHitAreas.length) return;
-    const { x, y } = e.detail || {};
-    if (typeof x !== 'number' || typeof y !== 'number') return;
+    const touch = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || null;
+    if (!touch) return;
+    const x = typeof touch.x === 'number' ? touch.x : typeof touch.clientX === 'number' ? touch.clientX : null;
+    const y = typeof touch.y === 'number' ? touch.y : typeof touch.clientY === 'number' ? touch.clientY : null;
+    if (x === null || y === null) return;
 
     let hit = null;
     let minDistance = Infinity;
@@ -122,10 +216,14 @@ Page({
     });
   },
 
+  onChartTap(e) {
+    this.onChartTouch(e);
+  },
+
   loadCatalog() {
     if (!this.data.selectedMemberId) return;
     this.setData({ catalogLoading: true, trendLoading: false });
-    request({ url: `/api/medical/metrics/catalog?subject_id=${this.data.selectedMemberId}` })
+    request({ url: `/api/medical/metrics/catalog?subject_id=${this.data.selectedMemberId}${this.catalogQuery()}` })
       .then((data) => {
         const catalog = data.items || [];
         this.setData({
@@ -162,7 +260,11 @@ Page({
       ? 'item_code=' + encodeURIComponent(item.item_code)
       : 'item_name=' + encodeURIComponent(item.item_name);
     this.setData({ trendLoading: true, activeTooltip: null });
-    request({ url: `/api/medical/metrics/trend?${q}&subject_id=${this.data.selectedMemberId}` })
+    const range = this.currentDateRange();
+    const extra = [];
+    if (range.date_from) extra.push('date_from=' + encodeURIComponent(range.date_from));
+    if (range.date_to) extra.push('date_to=' + encodeURIComponent(range.date_to));
+    request({ url: `/api/medical/metrics/trend?${q}&subject_id=${this.data.selectedMemberId}${extra.length ? '&' + extra.join('&') : ''}` })
       .then((trend) => {
         this.setTrendData(trend, { resetView });
         if ((resetView ? 'table' : this.data.viewMode) === 'chart') {
@@ -333,7 +435,7 @@ Page({
         ctx.stroke();
 
         ctx.fillStyle = '#999';
-        ctx.font = '16px sans-serif';
+        ctx.font = '14px sans-serif';
         scale.ticks.forEach((tick) => {
           const y = yAt(tick);
           ctx.fillText(this.formatTick(tick, scale.step), 4, y + 5);
@@ -375,7 +477,7 @@ Page({
 
         const labelIndexes = this.getXLabelIndices(points.length);
         ctx.fillStyle = '#999';
-        ctx.font = '16px sans-serif';
+        ctx.font = '14px sans-serif';
         labelIndexes.forEach((idx) => {
           const point = points[idx];
           if (!point) return;

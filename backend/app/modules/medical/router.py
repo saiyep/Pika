@@ -96,17 +96,22 @@ def _family_user_ids(db: Session, membership: FamilyMembership) -> list[int]:
     ]
 
 
-def _owner_acl_out(db: Session, owner_user_id: int) -> MedicalAclListOut:
-    grants = service.list_acl_grants(db, owner_user_id=owner_user_id)
+def _owner_acl_out(db: Session, membership: FamilyMembership, owner_user_id: int) -> MedicalAclListOut:
+    grants = {
+        g.grantee_user_id: (g.actions_json or sorted(service.MEDICAL_ACTIONS))
+        for g in service.list_acl_grants(db, owner_user_id=owner_user_id)
+    }
+    family_user_ids = _family_user_ids(db, membership)
     return MedicalAclListOut(
         owner_user_id=owner_user_id,
         grants=[
             MedicalAclGrantOut(
-                owner_user_id=g.owner_user_id,
-                grantee_user_id=g.grantee_user_id,
-                actions=g.actions_json or [],
+                owner_user_id=owner_user_id,
+                grantee_user_id=uid,
+                actions=grants.get(uid, sorted(service.MEDICAL_ACTIONS)),
             )
-            for g in grants
+            for uid in family_user_ids
+            if uid != owner_user_id
         ],
     )
 
@@ -123,7 +128,7 @@ def get_my_acl(
     _ensure_subject_in_family(db, user, owner_id)
     if owner_id != user.id:
         _require_action_on_owner(db, user, owner_id, "view_report")
-    return ApiResponse.ok(_owner_acl_out(db, owner_id))
+    return ApiResponse.ok(_owner_acl_out(db, membership, owner_id))
 
 
 @router.put("/permissions", response_model=ApiResponse[MedicalAclListOut])
@@ -144,7 +149,7 @@ def set_my_acl(
         grantee_user_id=body.grantee_user_id,
         actions=body.actions,
     )
-    return ApiResponse.ok(_owner_acl_out(db, user.id))
+    return ApiResponse.ok(_owner_acl_out(db, membership, user.id))
 
 
 @router.post("/reports", response_model=ApiResponse[ReportDetailOut])
@@ -532,13 +537,14 @@ def metric_trend(
         for metric, rep in rows
     ]
     first = rows[0][0] if rows else None
+    latest = rows[-1][0] if rows else None
     return ApiResponse.ok(
         TrendOut(
             item_code=item_code or (first.item_code if first else None),
             item_name=item_name or (first.item_name if first else ""),
-            unit=first.unit if first else None,
-            ref_low=None if has_mixed_reference else (first.ref_low if first else None),
-            ref_high=None if has_mixed_reference else (first.ref_high if first else None),
+            unit=latest.unit if latest else (first.unit if first else None),
+            ref_low=latest.ref_low if latest else None,
+            ref_high=latest.ref_high if latest else None,
             has_mixed_reference=has_mixed_reference,
             points=points,
         )

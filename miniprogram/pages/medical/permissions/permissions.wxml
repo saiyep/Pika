@@ -7,27 +7,25 @@
   <view wx:elif="{{members.length === 0}}" class="state-card">暂无可授权成员</view>
 
   <block wx:else>
-    <picker mode="selector" range="{{memberLabels}}" value="{{selectedMemberIndex}}" bindchange="onMemberPick">
-      <view class="member-card member-card-clickable">
-        <view class="member-head">
-          <view class="member-avatar">{{members[selectedMemberIndex].initial}}</view>
-          <view class="member-meta">
-            <view class="member-name">{{memberLabels[selectedMemberIndex] || '请选择成员'}}</view>
-          </view>
-          <text class="picker-arrow">›</text>
+    <view class="select-card">
+      <text class="section-title">成员</text>
+      <picker mode="selector" range="{{memberLabels}}" value="{{selectedMemberIndex}}" bindchange="onMemberPick">
+        <view class="picker-row">
+          <text class="picker-label">查看成员</text>
+          <text class="picker-value">{{memberLabels[selectedMemberIndex] || '请选择成员'}} ▾</text>
         </view>
-      </view>
-    </picker>
+      </picker>
+    </view>
 
     <view class="permissions-card" wx:if="{{selectedMemberId}}">
-      <view class="section-title">该成员对我的权限</view>
+      <text class="section-title">该成员对我的权限</text>
       <view wx:for="{{actionOptions}}" wx:key="key" class="permission-row">
         <view class="permission-copy">
           <view class="permission-label">{{item.label}}</view>
           <view class="permission-desc">{{item.key === 'view_report' ? '可查看我的检查记录与详情' : item.key === 'upload_for_owner' ? '可帮我上传新的检查单' : item.key === 'edit_report' ? '可修改报告内容与信息' : '可移除已有报告记录'}}</view>
         </view>
         <switch
-          checked="{{draftActions.indexOf(item.key) >= 0}}"
+          checked="{{item.checked}}"
           data-action="{{item.key}}"
           bindchange="onToggleAction"
           color="#07c160"

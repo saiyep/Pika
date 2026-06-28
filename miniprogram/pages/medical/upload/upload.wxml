@@ -5,19 +5,18 @@
   </view>
 
   <block wx:if="{{step === 'pick'}}">
-    <view class="card">
-      <view class="section-title">被检查人</view>
+    <view class="select-card">
+      <text class="section-title">被检查人</text>
       <picker mode="selector" range="{{memberLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">
         <view class="picker-row">
           <text class="picker-label">当前成员</text>
-          <text class="picker-value">{{memberLabels[subjectIndex] || '（未登录成员）'}}</text>
-          <text class="picker-arrow">›</text>
+          <text class="picker-value">{{memberLabels[subjectIndex] || '（未登录成员）'}} ▾</text>
         </view>
       </picker>
     </view>
 
-    <view class="card">
-      <view class="section-title">检查单图片</view>
+    <view class="select-card">
+      <text class="section-title">检查单图片</text>
       <view wx:if="{{!files.length}}" class="upload-dropzone" bindtap="chooseImage">
         <view class="upload-icon">＋</view>
         <view class="upload-title">添加检查单</view>
@@ -38,7 +37,7 @@
       <view class="progress-title">{{uploadRetrying ? '网络波动，正在重试' : '上传识别中'}}</view>
       <view class="progress-desc">{{uploadStageText || '正在分析图片内容并提取关注的检查信息，请稍候…'}}</view>
       <view class="progress-number">{{uploadProgress}}%</view>
-      <progress percent="{{uploadProgress}}" active stroke-width="6" color="#07c160" />
+      <progress percent="{{uploadProgress}}" active active-mode="forwards" stroke-width="6" color="#07c160" />
       <view class="progress-hint">识别通常需要一段时间，请不要离开当前页面。</view>
     </view>
 
@@ -50,16 +49,15 @@
   </block>
 
   <block wx:elif="{{step === 'edit'}}">
-    <view class="card summary-card">
-      <view class="section-title">确认检查信息</view>
+    <view class="select-card summary-card">
+      <text class="section-title">确认检查信息</text>
       <view class="summary-hint">请核对识别结果，补全必填信息后再保存。</view>
       <view class="section mini">
         <text class="section-title required">* 被检查人</text>
         <picker mode="selector" range="{{memberLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">
           <view class="picker-row">
             <text class="picker-label">当前成员</text>
-            <text class="picker-value">{{memberLabels[subjectIndex] || '请选择被检查人'}}</text>
-            <text class="picker-arrow">›</text>
+            <text class="picker-value">{{memberLabels[subjectIndex] || '请选择被检查人'}} ▾</text>
           </view>
         </picker>
       </view>
