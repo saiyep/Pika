@@ -1,0 +1,20 @@
+<view class="page">
+  <view class="section-head">
+    <text class="section-title">我的关注指标</text>
+    <view class="head-actions">
+      <button class="sub-btn" size="mini" bindtap="goMappingSettings">指标映射</button>
+      <button class="add-btn" type="primary" size="mini" bindtap="onAdd">新增</button>
+    </view>
+  </view>
+  <view wx:if="{{items.length === 0}}" class="empty">暂未配置关注指标</view>
+  <view wx:for="{{items}}" wx:key="id" class="item">
+    <view>
+      <text class="name">{{item.canonical_name}}</text>
+      <text class="meta">{{item.category_name || item.category_key}}{{item.canonical_unit ? ' · ' + item.canonical_unit : ''}}</text>
+    </view>
+    <view class="icon-actions">
+      <button class="icon-btn" data-id="{{item.id}}" bindtap="onEdit">✏️</button>
+      <button class="icon-btn del" data-id="{{item.id}}" bindtap="onDelete">🗑️</button>
+    </view>
+  </view>
+</view>

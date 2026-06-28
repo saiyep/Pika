@@ -4,13 +4,19 @@
     "pages/assistant/assistant",
     "pages/mine/mine",
     "pages/about/about",
+    "pages/settings/home/home",
+    "pages/settings/services/services",
     "pages/medical/home/home",
     "pages/medical/upload/upload",
     "pages/medical/history/history",
     "pages/medical/report-detail/report-detail",
     "pages/medical/metric-trend/metric-trend",
     "pages/medical/members/members",
-    "pages/medical/permissions/permissions"
+    "pages/medical/permissions/permissions",
+    "pages/medical/settings-medical/settings-medical",
+    "pages/medical/focus-metrics/focus-metrics",
+    "pages/medical/mapping-settings/mapping-settings",
+    "pages/medical/report-categories/report-categories"
   ],
   "tabBar": {
     "color": "#999999",

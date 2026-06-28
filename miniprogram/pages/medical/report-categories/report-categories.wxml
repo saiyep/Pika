@@ -1,0 +1,16 @@
+<view class="page">
+  <view class="section-head">
+    <text class="section-title">我的检查单分类</text>
+    <button class="add-btn" size="mini" bindtap="onAddCategory">新增</button>
+  </view>
+  <view wx:if="{{categories.length === 0}}" class="empty">暂未配置检查单分类</view>
+  <view wx:for="{{categories}}" wx:key="id" class="item">
+    <view class="item-main">
+      <text class="name">{{item.display_name}}</text>
+    </view>
+    <view class="icon-actions">
+      <view class="icon-btn" data-id="{{item.id}}" data-name="{{item.display_name}}" bindtap="onRenameCategory">✏️</view>
+      <view class="icon-btn del" data-id="{{item.id}}" bindtap="onDeleteCategory">🗑️</view>
+    </view>
+  </view>
+</view>

@@ -69,6 +69,8 @@ class TrendPoint(BaseModel):
 
 
 class TrendOut(BaseModel):
+    dictionary_id: int | None = None
+    category_key: str | None = None
     item_code: str | None = None
     item_name: str
     unit: str | None = None
@@ -79,6 +81,8 @@ class TrendOut(BaseModel):
 
 
 class CatalogItem(BaseModel):
+    dictionary_id: int | None = None
+    category_key: str | None = None
     item_code: str | None = None
     item_name: str
     count: int
@@ -142,3 +146,88 @@ class MedicalAclGrantOut(BaseModel):
 class MedicalAclListOut(BaseModel):
     owner_user_id: int
     grants: list[MedicalAclGrantOut]
+
+
+class CategoryOut(BaseModel):
+    id: int
+    category_key: str
+    display_name: str
+
+
+class CategoryListOut(BaseModel):
+    items: list[CategoryOut]
+
+
+class CategoryCreateIn(BaseModel):
+    display_name: str
+
+
+class CategoryUpdateIn(BaseModel):
+    display_name: str
+
+
+class FocusMetricUpsertIn(BaseModel):
+    dictionary_id: int
+    category_id: int
+
+
+class FocusMetricUpdateIn(BaseModel):
+    category_id: int
+
+
+class FocusMetricOut(BaseModel):
+    id: int
+    dictionary_id: int
+    category_id: int | None = None
+    category_key: str
+    category_name: str | None = None
+    canonical_key: str
+    canonical_name: str
+    canonical_unit: str | None = None
+
+
+class FocusMetricListOut(BaseModel):
+    items: list[FocusMetricOut]
+
+
+class BootstrapOut(BaseModel):
+    dictionary_created: int
+    alias_created: int
+
+
+class MappingRebuildOut(BaseModel):
+    mapped: int
+    unmapped: int
+
+
+class MappingAliasOut(BaseModel):
+    id: int
+    owner_user_id: int
+    dictionary_id: int
+    alias_name: str
+    alias_unit: str | None = None
+    hospital_hint: str | None = None
+    report_type_hint: str | None = None
+    priority: int
+    canonical_name: str
+    canonical_unit: str | None = None
+    category_key: str
+
+
+class MappingAliasListOut(BaseModel):
+    items: list[MappingAliasOut]
+
+
+class MappingAliasCreateIn(BaseModel):
+    dictionary_id: int
+    alias_name: str
+    alias_unit: str | None = None
+    hospital_hint: str | None = None
+    priority: int = 10
+
+
+class MappingAliasUpdateIn(BaseModel):
+    alias_name: str | None = None
+    alias_unit: str | None = None
+    hospital_hint: str | None = None
+    priority: int | None = None

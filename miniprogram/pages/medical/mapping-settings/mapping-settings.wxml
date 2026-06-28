@@ -1,0 +1,25 @@
+<view class="page">
+  <view class="card" style="margin-bottom: 20rpx;">
+    <view class="row" style="justify-content: space-between; align-items: center;">
+      <text class="title">医院维度</text>
+      <button size="mini" bindtap="onPickHospital">{{selectedHospital || '全部医院'}}</button>
+    </view>
+    <view class="row" style="margin-top: 16rpx;">
+      <button type="primary" size="mini" bindtap="onAddAlias">新增别名</button>
+      <button size="mini" bindtap="onRebuild" style="margin-left: 16rpx;">重建映射</button>
+    </view>
+  </view>
+
+  <view wx:if="{{aliases.length === 0}}" class="empty">暂无映射别名，可先新增</view>
+
+  <view wx:for="{{aliases}}" wx:key="id" class="card" style="margin-bottom: 16rpx;">
+    <view>
+      <text class="title">{{item.alias_name}}</text>
+      <text class="desc">{{item.canonical_name}}（{{item.category_key}}）{{item.hospital_hint ? ' · ' + item.hospital_hint : ' · 全医院'}}</text>
+    </view>
+    <view class="row" style="margin-top: 12rpx;">
+      <button size="mini" data-id="{{item.id}}" data-name="{{item.alias_name}}" bindtap="onEditAlias">修改</button>
+      <button size="mini" type="warn" data-id="{{item.id}}" bindtap="onDeleteAlias" style="margin-left: 16rpx;">删除</button>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,14 @@
+.page { padding: 32rpx; }
+.empty { color: #999; font-size: 26rpx; margin: 10rpx 0 20rpx; }
+.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16rpx; }
+.section-title { font-size: 30rpx; font-weight: 600; color: #222; }
+.head-actions { display: flex; align-items: center; gap: 12rpx; }
+.add-btn { min-width: 112rpx; }
+.sub-btn { min-width: 132rpx; }
+.item { background: #fff; border-radius: 14rpx; padding: 22rpx 24rpx; margin-bottom: 16rpx; display: flex; align-items: center; justify-content: space-between; }
+.name { display: block; font-size: 28rpx; color: #222; }
+.meta { display: block; margin-top: 6rpx; font-size: 22rpx; color: #888; }
+.icon-actions { display: flex; align-items: center; gap: 12rpx; }
+.icon-btn { width: 60rpx; height: 60rpx; min-height: 60rpx; border-radius: 30rpx; display: flex; align-items: center; justify-content: center; background: #f6f7f8; color: #444; padding: 0; line-height: 1; font-size: 30rpx; border: 0; }
+.icon-btn::after { border: 0; }
+.icon-btn.del { color: #e64a4a; }

@@ -19,8 +19,8 @@
     <text class="card-desc">看某项指标随时间变化</text>
   </view>
 
-  <view class="module-card" bindtap="goPermissions">
-    <text class="card-title">权限设置</text>
-    <text class="card-desc">设置家庭成员对我就医数据的查看/代上传/编辑/删除权限</text>
+  <view class="module-card" bindtap="goMedicalSettings">
+    <text class="card-title">就医设置</text>
+    <text class="card-desc">管理我的关注指标与分类配置入口</text>
   </view>
 </view>

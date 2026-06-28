@@ -5,13 +5,23 @@ import os
 import uuid
 from datetime import date, datetime, timedelta
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.core import storage
 from app.core.exceptions import DuplicateReportError
 from app.core.user import service as user_service
 from app.modules.medical import vision
-from app.modules.medical.models import MedicalAclGrant, MedicalReport, MedicalReportMetric
+from app.modules.medical.models import (
+    MedicalAclGrant,
+    MedicalMetricAlias,
+    MedicalMetricDictionary,
+    MedicalReport,
+    MedicalReportCategory,
+    MedicalReportMetric,
+    MedicalReportMetricMap,
+    MedicalUserFocusMetric,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +31,23 @@ MEDICAL_ACTIONS = {
     "edit_report",
     "delete_report",
 }
+
+MEDICAL_CATEGORY_DEFAULTS = [
+    ("blood_routine", "血常规", 10),
+    ("urine_routine", "尿常规", 20),
+    ("liver_kidney", "肝肾功能", 30),
+    ("tumor_marker", "肿瘤标志物", 40),
+    ("thyroid", "甲状腺功能", 50),
+]
+MEDICAL_CATEGORY_KEYS = {key for key, _, _ in MEDICAL_CATEGORY_DEFAULTS}
+
+_KEYWORD_CATEGORY_RULES = [
+    ("blood_routine", ["白细胞", "红细胞", "血小板", "血红蛋白", "中性粒", "淋巴"]),
+    ("urine_routine", ["尿", "尿蛋白", "尿糖", "尿酮体", "尿白细胞"]),
+    ("liver_kidney", ["谷丙", "谷草", "肌酐", "尿素", "总蛋白", "白蛋白", "胆红素"]),
+    ("tumor_marker", ["肿瘤", "癌胚", "甲胎", "ca125", "ca199", "psa"]),
+    ("thyroid", ["甲状", "t3", "t4", "tsh", "ft3", "ft4"]),
+]
 
 _DRAFT_TTL = timedelta(hours=1)
 _DRAFTS: dict[str, dict] = {}
@@ -124,8 +151,12 @@ def create_draft_from_images(
     raw_json = None
     status = "parsed"
 
+    owner_user_id = subject_id or uploader_id
+    categories = list_user_categories(db, user_id=owner_user_id)
+    candidates = [c.display_name for c in categories if c.enabled]
+
     try:
-        parsed, raw_text = vision.parse_report_image(files[0][0])
+        parsed, raw_text = vision.parse_report_image(files[0][0], category_candidates=candidates)
         is_lab_report = parsed["is_lab_report"]
         report_type = parsed["report_type"]
         report_type_label = parsed["report_type_label"]
@@ -405,3 +436,486 @@ def has_acl_action(
     if not actions:
         return True
     return action in actions
+
+
+def ensure_user_categories(db: Session, *, user_id: int) -> None:
+    exists = (
+        db.query(MedicalReportCategory.id)
+        .filter(MedicalReportCategory.user_id == user_id, MedicalReportCategory.enabled.is_(True))
+        .first()
+    )
+    if exists:
+        return
+
+    for key, display_name, sort_order in MEDICAL_CATEGORY_DEFAULTS:
+        db.add(
+            MedicalReportCategory(
+                user_id=user_id,
+                category_key=key,
+                display_name=display_name,
+                enabled=True,
+                sort_order=sort_order,
+            )
+        )
+    db.commit()
+
+
+def list_user_categories(db: Session, *, user_id: int) -> list[MedicalReportCategory]:
+    ensure_user_categories(db, user_id=user_id)
+    return (
+        db.query(MedicalReportCategory)
+        .filter(MedicalReportCategory.user_id == user_id, MedicalReportCategory.enabled.is_(True))
+        .order_by(MedicalReportCategory.id.asc())
+        .all()
+    )
+
+
+def get_user_category_by_id(
+    db: Session,
+    *,
+    user_id: int,
+    category_id: int,
+) -> MedicalReportCategory | None:
+    return (
+        db.query(MedicalReportCategory)
+        .filter(
+            MedicalReportCategory.id == category_id,
+            MedicalReportCategory.user_id == user_id,
+            MedicalReportCategory.enabled.is_(True),
+        )
+        .first()
+    )
+
+
+def create_user_category(db: Session, *, user_id: int, display_name: str) -> MedicalReportCategory:
+    clean_name = (display_name or "").strip()
+    if not clean_name:
+        raise ValueError("display_name required")
+
+    category = MedicalReportCategory(
+        user_id=user_id,
+        category_key=f"custom_{uuid.uuid4().hex[:8]}",
+        display_name=clean_name,
+        enabled=True,
+        sort_order=0,
+    )
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+def rename_user_category(db: Session, *, user_id: int, category_id: int, display_name: str) -> MedicalReportCategory:
+    category = (
+        db.query(MedicalReportCategory)
+        .filter(
+            MedicalReportCategory.id == category_id,
+            MedicalReportCategory.user_id == user_id,
+            MedicalReportCategory.enabled.is_(True),
+        )
+        .first()
+    )
+    if category is None:
+        raise ValueError("category not found")
+
+    clean_name = (display_name or "").strip()
+    if not clean_name:
+        raise ValueError("display_name required")
+
+    category.display_name = clean_name
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+def disable_user_category(db: Session, *, user_id: int, category_id: int) -> bool:
+    category = (
+        db.query(MedicalReportCategory)
+        .filter(
+            MedicalReportCategory.id == category_id,
+            MedicalReportCategory.user_id == user_id,
+            MedicalReportCategory.enabled.is_(True),
+        )
+        .first()
+    )
+    if category is None:
+        return False
+    category.enabled = False
+    db.commit()
+    return True
+
+def create_user_focus_metric(
+    db: Session,
+    *,
+    user_id: int,
+    dictionary_id: int,
+    category_id: int,
+) -> MedicalUserFocusMetric:
+    dictionary = db.get(MedicalMetricDictionary, dictionary_id)
+    if dictionary is None:
+        raise ValueError("dictionary not found")
+
+    category = get_user_category_by_id(db, user_id=user_id, category_id=category_id)
+    if category is None:
+        raise ValueError("category not found")
+
+    row = (
+        db.query(MedicalUserFocusMetric)
+        .filter(
+            MedicalUserFocusMetric.user_id == user_id,
+            MedicalUserFocusMetric.dictionary_id == dictionary_id,
+        )
+        .first()
+    )
+    if row is not None:
+        raise ValueError("focus metric already exists")
+
+    row = MedicalUserFocusMetric(
+        user_id=user_id,
+        dictionary_id=dictionary_id,
+        category_key=category.category_key,
+        enabled=True,
+        sort_order=0,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def update_user_focus_metric_category(
+    db: Session,
+    *,
+    user_id: int,
+    focus_id: int,
+    category_id: int,
+) -> MedicalUserFocusMetric:
+    category = get_user_category_by_id(db, user_id=user_id, category_id=category_id)
+    if category is None:
+        raise ValueError("category not found")
+
+    row = (
+        db.query(MedicalUserFocusMetric)
+        .filter(
+            MedicalUserFocusMetric.id == focus_id,
+            MedicalUserFocusMetric.user_id == user_id,
+        )
+        .first()
+    )
+    if row is None:
+        raise ValueError("focus metric not found")
+
+    row.category_key = category.category_key
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def list_user_focus_metrics(db: Session, *, user_id: int) -> list[MedicalUserFocusMetric]:
+    return (
+        db.query(MedicalUserFocusMetric)
+        .filter(MedicalUserFocusMetric.user_id == user_id)
+        .order_by(MedicalUserFocusMetric.sort_order.asc(), MedicalUserFocusMetric.id.asc())
+        .all()
+    )
+
+
+def delete_user_focus_metric(db: Session, *, user_id: int, focus_id: int) -> bool:
+    row = (
+        db.query(MedicalUserFocusMetric)
+        .filter(
+            MedicalUserFocusMetric.id == focus_id,
+            MedicalUserFocusMetric.user_id == user_id,
+        )
+        .first()
+    )
+    if row is None:
+        return False
+    db.delete(row)
+    db.commit()
+    return True
+
+
+def list_user_focus_metric_details(db: Session, *, user_id: int) -> list[tuple[MedicalUserFocusMetric, MedicalMetricDictionary]]:
+    return (
+        db.query(MedicalUserFocusMetric, MedicalMetricDictionary)
+        .join(MedicalMetricDictionary, MedicalMetricDictionary.id == MedicalUserFocusMetric.dictionary_id)
+        .filter(MedicalUserFocusMetric.user_id == user_id)
+        .order_by(MedicalUserFocusMetric.sort_order.asc(), MedicalUserFocusMetric.id.asc())
+        .all()
+    )
+
+
+def _guess_category(item_name: str) -> str:
+    name = (item_name or "").strip().lower()
+    for category_key, keywords in _KEYWORD_CATEGORY_RULES:
+        for kw in keywords:
+            if kw in name:
+                return category_key
+    return "blood_routine"
+
+
+def bootstrap_metric_dictionary(db: Session, *, owner_user_id: int) -> dict:
+    rows = (
+        db.query(
+            MedicalReportMetric.item_name,
+            MedicalReportMetric.item_code,
+            MedicalReportMetric.unit,
+            MedicalReport.hospital,
+        )
+        .join(MedicalReport, MedicalReport.id == MedicalReportMetric.report_id)
+        .filter(
+            or_(
+                MedicalReport.subject_id == owner_user_id,
+                and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id == owner_user_id),
+            )
+        )
+        .all()
+    )
+
+    created_dictionary = 0
+    created_alias = 0
+
+    for item_name, item_code, unit, hospital in rows:
+        clean_name = (item_name or "").strip()
+        if not clean_name:
+            continue
+        canonical_key = ((item_code or "").strip() or clean_name).lower()
+        category_key = _guess_category(clean_name)
+
+        dic = (
+            db.query(MedicalMetricDictionary)
+            .filter(MedicalMetricDictionary.canonical_key == canonical_key)
+            .first()
+        )
+        if dic is None:
+            dic = MedicalMetricDictionary(
+                canonical_key=canonical_key,
+                canonical_name=clean_name,
+                canonical_unit=(unit or None),
+                category_key=category_key,
+                enabled=True,
+            )
+            db.add(dic)
+            db.flush()
+            created_dictionary += 1
+
+        alias = (
+            db.query(MedicalMetricAlias)
+            .filter(
+                MedicalMetricAlias.owner_user_id == owner_user_id,
+                MedicalMetricAlias.dictionary_id == dic.id,
+                MedicalMetricAlias.alias_name == clean_name,
+                MedicalMetricAlias.alias_unit == (unit or None),
+                MedicalMetricAlias.hospital_hint == (hospital or None),
+            )
+            .first()
+        )
+        if alias is None:
+            db.add(
+                MedicalMetricAlias(
+                    owner_user_id=owner_user_id,
+                    dictionary_id=dic.id,
+                    alias_name=clean_name,
+                    alias_unit=(unit or None),
+                    hospital_hint=(hospital or None),
+                    report_type_hint=None,
+                    priority=100 if hospital else 10,
+                )
+            )
+            created_alias += 1
+
+    db.commit()
+    return {
+        "dictionary_created": created_dictionary,
+        "alias_created": created_alias,
+    }
+
+
+def list_metric_alias_details(
+    db: Session,
+    *,
+    owner_user_id: int,
+    hospital_hint: str | None = None,
+    category_key: str | None = None,
+    dictionary_id: int | None = None,
+) -> list[tuple[MedicalMetricAlias, MedicalMetricDictionary]]:
+    q = (
+        db.query(MedicalMetricAlias, MedicalMetricDictionary)
+        .join(MedicalMetricDictionary, MedicalMetricDictionary.id == MedicalMetricAlias.dictionary_id)
+        .filter(MedicalMetricAlias.owner_user_id == owner_user_id)
+    )
+    if hospital_hint is not None:
+        q = q.filter(MedicalMetricAlias.hospital_hint == hospital_hint)
+    if category_key:
+        q = q.filter(MedicalMetricDictionary.category_key == category_key)
+    if dictionary_id is not None:
+        q = q.filter(MedicalMetricAlias.dictionary_id == dictionary_id)
+
+    return q.order_by(MedicalMetricAlias.priority.desc(), MedicalMetricAlias.id.asc()).all()
+
+
+def create_metric_alias(
+    db: Session,
+    *,
+    owner_user_id: int,
+    dictionary_id: int,
+    alias_name: str,
+    alias_unit: str | None = None,
+    hospital_hint: str | None = None,
+    priority: int = 10,
+) -> MedicalMetricAlias:
+    dic = db.get(MedicalMetricDictionary, dictionary_id)
+    if dic is None:
+        raise ValueError("dictionary not found")
+
+    clean_name = (alias_name or "").strip()
+    if not clean_name:
+        raise ValueError("alias_name required")
+
+    row = (
+        db.query(MedicalMetricAlias)
+        .filter(
+            MedicalMetricAlias.owner_user_id == owner_user_id,
+            MedicalMetricAlias.dictionary_id == dictionary_id,
+            MedicalMetricAlias.alias_name == clean_name,
+            MedicalMetricAlias.alias_unit == ((alias_unit or "").strip() or None),
+            MedicalMetricAlias.hospital_hint == ((hospital_hint or "").strip() or None),
+        )
+        .first()
+    )
+    if row is not None:
+        raise ValueError("alias already exists")
+
+    row = MedicalMetricAlias(
+        owner_user_id=owner_user_id,
+        dictionary_id=dictionary_id,
+        alias_name=clean_name,
+        alias_unit=((alias_unit or "").strip() or None),
+        hospital_hint=((hospital_hint or "").strip() or None),
+        report_type_hint=None,
+        priority=priority,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def update_metric_alias(
+    db: Session,
+    *,
+    owner_user_id: int,
+    alias_id: int,
+    alias_name: str | None = None,
+    alias_unit: str | None = None,
+    hospital_hint: str | None = None,
+    priority: int | None = None,
+) -> MedicalMetricAlias:
+    row = (
+        db.query(MedicalMetricAlias)
+        .filter(
+            MedicalMetricAlias.id == alias_id,
+            MedicalMetricAlias.owner_user_id == owner_user_id,
+        )
+        .first()
+    )
+    if row is None:
+        raise ValueError("alias not found")
+
+    if alias_name is not None:
+        clean_name = alias_name.strip()
+        if not clean_name:
+            raise ValueError("alias_name required")
+        row.alias_name = clean_name
+    if alias_unit is not None:
+        row.alias_unit = (alias_unit or "").strip() or None
+    if hospital_hint is not None:
+        row.hospital_hint = (hospital_hint or "").strip() or None
+    if priority is not None:
+        row.priority = priority
+
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def delete_metric_alias(db: Session, *, owner_user_id: int, alias_id: int) -> bool:
+    row = (
+        db.query(MedicalMetricAlias)
+        .filter(
+            MedicalMetricAlias.id == alias_id,
+            MedicalMetricAlias.owner_user_id == owner_user_id,
+        )
+        .first()
+    )
+    if row is None:
+        return False
+    db.delete(row)
+    db.commit()
+    return True
+
+
+def rebuild_metric_mappings(db: Session, *, owner_user_id: int) -> dict:
+    aliases = db.query(MedicalMetricAlias).filter(MedicalMetricAlias.owner_user_id == owner_user_id).all()
+    alias_by_name: dict[str, list[MedicalMetricAlias]] = {}
+    for alias in aliases:
+        alias_by_name.setdefault(alias.alias_name.strip().lower(), []).append(alias)
+
+    rows = (
+        db.query(MedicalReportMetric, MedicalReport)
+        .join(MedicalReport, MedicalReport.id == MedicalReportMetric.report_id)
+        .filter(
+            or_(
+                MedicalReport.subject_id == owner_user_id,
+                and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id == owner_user_id),
+            )
+        )
+        .all()
+    )
+
+    mapped = 0
+    unmapped = 0
+
+    for metric, report in rows:
+        key = (metric.item_name or "").strip().lower()
+        candidates = alias_by_name.get(key, [])
+        best: MedicalMetricAlias | None = None
+        best_score = -1
+        for candidate in candidates:
+            score = candidate.priority or 0
+            if candidate.alias_unit and metric.unit and candidate.alias_unit == metric.unit:
+                score += 10
+            if candidate.hospital_hint and report.hospital and candidate.hospital_hint == report.hospital:
+                score += 20
+            if score > best_score:
+                best = candidate
+                best_score = score
+
+        mapping = (
+            db.query(MedicalReportMetricMap)
+            .filter(MedicalReportMetricMap.report_metric_id == metric.id)
+            .first()
+        )
+        if mapping is None:
+            mapping = MedicalReportMetricMap(report_metric_id=metric.id)
+            db.add(mapping)
+
+        if best is None:
+            mapping.dictionary_id = None
+            mapping.alias_id = None
+            mapping.match_status = "unmapped"
+            mapping.confidence = None
+            unmapped += 1
+        else:
+            mapping.dictionary_id = best.dictionary_id
+            mapping.alias_id = best.id
+            mapping.match_status = "auto"
+            mapping.confidence = 1.0
+            mapped += 1
+
+    db.commit()
+    return {
+        "mapped": mapped,
+        "unmapped": unmapped,
+    }

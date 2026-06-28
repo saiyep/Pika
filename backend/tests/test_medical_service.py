@@ -3,6 +3,11 @@ import pytest
 from app.core.user import service as user_service
 from app.core.user.models import FamilyMembership, User
 from app.modules.medical import service, vision
+from app.modules.medical.models import (
+    MedicalMetricAlias,
+    MedicalMetricDictionary,
+    MedicalReportMetricMap,
+)
 
 
 @pytest.fixture
@@ -40,7 +45,7 @@ _FAKE_PARSED = {
 
 
 def test_draft_then_commit_persists_report(db_session, user, tmp_upload, monkeypatch):
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
 
     draft = service.create_draft_from_images(
         db_session,
@@ -74,7 +79,7 @@ def test_draft_then_commit_persists_report(db_session, user, tmp_upload, monkeyp
 
 
 def test_multi_image_draft_keeps_all_paths(db_session, user, tmp_upload, monkeypatch):
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
 
     draft = service.create_draft_from_images(
         db_session,
@@ -128,7 +133,7 @@ def test_delete_report_removes_row_metrics_and_files(db_session, user, tmp_uploa
     from app.core import storage
     from app.modules.medical.models import MedicalReportMetric
 
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
 
     draft = service.create_draft_from_images(
         db_session,
@@ -177,7 +182,7 @@ def _commit(db_session, draft):
 def test_duplicate_upload_rejected_after_commit(db_session, user, tmp_upload, monkeypatch):
     from app.core.exceptions import DuplicateReportError
 
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
     img = (b"\x89PNG\r\n\x1a\n same-bytes", "a.png", "image/png")
 
     draft = service.create_draft_from_images(
@@ -193,7 +198,7 @@ def test_duplicate_upload_rejected_after_commit(db_session, user, tmp_upload, mo
 
 
 def test_different_images_not_rejected(db_session, user, tmp_upload, monkeypatch):
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
 
     d1 = service.create_draft_from_images(
         db_session, uploader_id=user.id, subject_id=None,
@@ -210,7 +215,7 @@ def test_different_images_not_rejected(db_session, user, tmp_upload, monkeypatch
 
 
 def test_content_hash_is_order_independent(db_session, user, tmp_upload, monkeypatch):
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
     a = (b"\x89PNG\r\n\x1a\n aaa", "a.png", "image/png")
     b = (b"\xff\xd8\xff bbb", "b.jpg", "image/jpeg")
 
@@ -242,7 +247,7 @@ def test_reparse_recovers_failed_report(db_session, user, tmp_upload, monkeypatc
     assert len(report.metrics) == 0
 
     # Azure recovers -> reparse fills metrics and flips status.
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
     reparsed = service.reparse_report(db_session, report_id=report.id)
 
     assert reparsed.status == "parsed"
@@ -257,7 +262,7 @@ def test_reparse_missing_report_returns_none(db_session):
 
 def test_hospital_falls_back_to_parsed_when_no_override(db_session, user, tmp_upload, monkeypatch):
     parsed = {**_FAKE_PARSED, "hospital": "北京协和医院"}
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (parsed, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (parsed, "{}"))
 
     draft = service.create_draft_from_images(
         db_session, uploader_id=user.id, subject_id=None,
@@ -268,7 +273,7 @@ def test_hospital_falls_back_to_parsed_when_no_override(db_session, user, tmp_up
 
 def test_hospital_override_wins_over_parsed(db_session, user, tmp_upload, monkeypatch):
     parsed = {**_FAKE_PARSED, "hospital": "解析出的医院"}
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (parsed, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (parsed, "{}"))
 
     draft = service.create_draft_from_images(
         db_session, uploader_id=user.id, subject_id=None,
@@ -277,9 +282,50 @@ def test_hospital_override_wins_over_parsed(db_session, user, tmp_upload, monkey
     assert draft["hospital"] == "用户填的医院"
 
 
+def test_parse_uses_subject_category_candidates(db_session, user, tmp_upload, monkeypatch):
+    captured = {}
+
+    spouse = User(openid="spouse-cate", nickname="爱人", role="member", account_type="wechat", status="active")
+    db_session.add(spouse)
+    db_session.commit()
+    db_session.refresh(spouse)
+
+    owner_m = user_service.get_active_membership(db_session, user_id=user.id)
+    assert owner_m is not None
+    db_session.add(FamilyMembership(family_id=owner_m.family_id, user_id=spouse.id, family_role="member", is_active=True))
+    db_session.commit()
+
+    categories = service.list_user_categories(db_session, user_id=spouse.id)
+    blood = next((x for x in categories if x.category_key == "blood_routine"), None)
+    assert blood is not None
+    service.rename_user_category(
+        db_session,
+        user_id=spouse.id,
+        category_id=blood.id,
+        display_name="配偶血常规",
+    )
+
+    def fake_parse(_b, **kwargs):
+        captured["candidates"] = kwargs.get("category_candidates")
+        return _FAKE_PARSED, "{}"
+
+    monkeypatch.setattr(vision, "parse_report_image", fake_parse)
+
+    service.create_draft_from_images(
+        db_session,
+        uploader_id=user.id,
+        subject_id=spouse.id,
+        files=[(b"\x89PNG\r\n\x1a\n h3", "a.png", "image/png")],
+        hospital_override="X",
+    )
+
+    assert captured["candidates"] is not None
+    assert "配偶血常规" in captured["candidates"]
+
+
 def test_is_lab_report_flag_passed_to_draft(db_session, user, tmp_upload, monkeypatch):
     parsed = {**_FAKE_PARSED, "is_lab_report": False, "metrics": []}
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (parsed, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (parsed, "{}"))
 
     draft = service.create_draft_from_images(
         db_session, uploader_id=user.id, subject_id=None,
@@ -289,7 +335,7 @@ def test_is_lab_report_flag_passed_to_draft(db_session, user, tmp_upload, monkey
 
 
 def test_update_report_edits_header_and_metrics(db_session, user, tmp_upload, monkeypatch):
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
     draft = service.create_draft_from_images(
         db_session, uploader_id=user.id, subject_id=None,
         files=[(b"\x89PNG\r\n\x1a\n upd", "a.png", "image/png")], hospital_override="旧医院",
@@ -336,7 +382,7 @@ def test_subject_id_flows_draft_to_committed_report(db_session, user, tmp_upload
     db_session.add(FamilyMembership(family_id=owner_m.family_id, user_id=mom.id, family_role="member", is_active=True))
     db_session.commit()
 
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
     draft = service.create_draft_from_images(
         db_session, uploader_id=user.id, subject_id=mom.id,
         files=[(b"\x89PNG\r\n\x1a\n subj", "a.png", "image/png")], hospital_override="X",
@@ -360,7 +406,7 @@ def test_list_filter_by_subject(db_session, user, tmp_upload, monkeypatch):
     db_session.add(FamilyMembership(family_id=owner_m.family_id, user_id=mom.id, family_role="member", is_active=True))
     db_session.commit()
 
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
     # one report for user, one for mom
     for sid, img in [(user.id, b"\x89PNG\r\n\x1a\n me"), (mom.id, b"\x89PNG\r\n\x1a\n mom")]:
         d = service.create_draft_from_images(
@@ -428,7 +474,7 @@ def test_metric_trend_marks_mixed_reference_ranges(db_session, user, tmp_upload,
         ],
     }
 
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (parsed_a if b.endswith(b"a") else parsed_b, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (parsed_a if b.endswith(b"a") else parsed_b, "{}"))
 
     d1 = service.create_draft_from_images(
         db_session, uploader_id=user.id, subject_id=user.id,
@@ -465,7 +511,7 @@ def test_metric_trend_marks_mixed_reference_ranges(db_session, user, tmp_upload,
 def test_list_reports_filters_multiple_hospitals(db_session, user, tmp_upload, monkeypatch):
     from app.modules.medical import router
 
-    monkeypatch.setattr(vision, "parse_report_image", lambda b: (_FAKE_PARSED, "{}"))
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
 
     for hospital, content in [
         ("医院A", b"\x89PNG\r\n\x1a\n a"),
@@ -536,4 +582,360 @@ def test_empty_acl_record_is_treated_as_default_allow(db_session, user):
     assert set(grant.actions_json or []) == set(service.MEDICAL_ACTIONS)
     assert service.has_acl_action(db_session, actor_user_id=spouse.id, owner_user_id=user.id, action="view_report") is True
     assert service.has_acl_action(db_session, actor_user_id=spouse.id, owner_user_id=user.id, action="upload_for_owner") is True
+
+
+def test_list_user_categories_auto_seeds_defaults(db_session, user):
+    rows = service.list_user_categories(db_session, user_id=user.id)
+    assert len(rows) == 5
+    assert {r.category_key for r in rows} == {k for k, _, _ in service.MEDICAL_CATEGORY_DEFAULTS}
+
+
+def test_category_rename_persists_for_user(db_session, user):
+    from app.modules.medical import router
+
+    membership = user_service.get_active_membership(db_session, user_id=user.id)
+    assert membership is not None
+
+    categories = service.list_user_categories(db_session, user_id=user.id)
+    blood = next((x for x in categories if x.category_key == "blood_routine"), None)
+    assert blood is not None
+
+    body = router.CategoryUpdateIn(display_name="血常规重点")
+    out = router.rename_category(
+        category_id=blood.id,
+        body=body,
+        db=db_session,
+        user=user,
+        membership=membership,
+    )
+
+    assert out.data is not None
+    target = next((x for x in out.data.items if x.id == blood.id), None)
+    assert target is not None
+    assert target.display_name == "血常规重点"
+
+
+def test_category_rename_isolated_per_user(db_session, user):
+    from app.modules.medical import router
+
+    spouse = User(openid="cat-user", nickname="成员", role="member", account_type="wechat", status="active")
+    db_session.add(spouse)
+    db_session.commit()
+    db_session.refresh(spouse)
+
+    owner_m = user_service.get_active_membership(db_session, user_id=user.id)
+    assert owner_m is not None
+    spouse_m = FamilyMembership(family_id=owner_m.family_id, user_id=spouse.id, family_role="member", is_active=True)
+    db_session.add(spouse_m)
+    db_session.commit()
+
+    user_cats = service.list_user_categories(db_session, user_id=user.id)
+    spouse_cats = service.list_user_categories(db_session, user_id=spouse.id)
+    user_blood = next((x for x in user_cats if x.category_key == "blood_routine"), None)
+    spouse_blood = next((x for x in spouse_cats if x.category_key == "blood_routine"), None)
+    assert user_blood is not None and spouse_blood is not None
+
+    router.rename_category(
+        category_id=user_blood.id,
+        body=router.CategoryUpdateIn(display_name="A分类"),
+        db=db_session,
+        user=user,
+        membership=owner_m,
+    )
+
+    out_spouse = router.rename_category(
+        category_id=spouse_blood.id,
+        body=router.CategoryUpdateIn(display_name="B分类"),
+        db=db_session,
+        user=spouse,
+        membership=spouse_m,
+    )
+
+    spouse_target = next((x for x in out_spouse.data.items if x.id == spouse_blood.id), None)
+    assert spouse_target is not None
+    assert spouse_target.display_name == "B分类"
+
+
+def test_focus_metrics_create_update_delete(db_session, user):
+    from app.modules.medical import router
+
+    db_session.add(
+        MedicalMetricDictionary(
+            canonical_key="plt",
+            canonical_name="血小板",
+            canonical_unit="10^9/L",
+            category_key="blood_routine",
+            enabled=True,
+        )
+    )
+    db_session.commit()
+
+    dic = db_session.query(MedicalMetricDictionary).filter_by(canonical_key="plt").first()
+    categories = service.list_user_categories(db_session, user_id=user.id)
+    blood = next((x for x in categories if x.category_key == "blood_routine"), None)
+    urine = next((x for x in categories if x.category_key == "urine_routine"), None)
+    assert dic is not None and blood is not None and urine is not None
+
+    out1 = router.create_focus_metric(
+        body=router.FocusMetricUpsertIn(
+            dictionary_id=dic.id,
+            category_id=blood.id,
+        ),
+        db=db_session,
+        user=user,
+    )
+    assert out1.data is not None
+    assert len(out1.data.items) == 1
+    assert out1.data.items[0].canonical_name == "血小板"
+    assert out1.data.items[0].category_id == blood.id
+
+    focus_id = out1.data.items[0].id
+    out2 = router.update_focus_metric(
+        focus_id=focus_id,
+        body=router.FocusMetricUpdateIn(category_id=urine.id),
+        db=db_session,
+        user=user,
+    )
+    assert out2.data is not None
+    assert out2.data.items[0].category_id == urine.id
+
+    out3 = router.delete_focus_metric(focus_id=focus_id, db=db_session, user=user)
+    assert out3.data is not None
+    assert out3.data.items == []
+
+
+def test_focus_metric_requires_existing_category(db_session, user):
+    from app.modules.medical import router
+
+    db_session.add(
+        MedicalMetricDictionary(
+            canonical_key="wbc",
+            canonical_name="白细胞",
+            canonical_unit="10^9/L",
+            category_key="blood_routine",
+            enabled=True,
+        )
+    )
+    db_session.commit()
+
+    dic = db_session.query(MedicalMetricDictionary).filter_by(canonical_key="wbc").first()
+    assert dic is not None
+
+    with pytest.raises(router.PikaException) as exc:
+        router.create_focus_metric(
+            body=router.FocusMetricUpsertIn(
+                dictionary_id=dic.id,
+                category_id=999999,
+            ),
+            db=db_session,
+            user=user,
+        )
+    assert "category not found" in str(exc.value)
+
+
+def test_bootstrap_creates_dictionary_and_alias(db_session, user, tmp_upload, monkeypatch):
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
+
+    d1 = service.create_draft_from_images(
+        db_session,
+        uploader_id=user.id,
+        subject_id=user.id,
+        files=[(b"\x89PNG\r\n\x1a\n aa", "a.png", "image/png")],
+        hospital_override="医院A",
+    )
+    service.commit_draft(
+        db_session,
+        draft_id=d1["draft_id"],
+        report_type=d1["report_type"],
+        report_type_label=d1["report_type_label"],
+        report_date=d1["report_date"],
+        hospital=d1["hospital"],
+        metrics=d1["metrics"],
+    )
+
+    out = service.bootstrap_metric_dictionary(db_session, owner_user_id=user.id)
+    assert out["dictionary_created"] >= 1
+    assert out["alias_created"] >= 1
+
+    dic = db_session.query(MedicalMetricDictionary).filter_by(canonical_key="wbc").first()
+    assert dic is not None
+    alias = db_session.query(MedicalMetricAlias).filter_by(owner_user_id=user.id, dictionary_id=dic.id, alias_name="WBC").first()
+    assert alias is not None
+
+
+def test_rebuild_metric_mappings_auto_matches_alias(db_session, user, tmp_upload, monkeypatch):
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
+
+    d1 = service.create_draft_from_images(
+        db_session,
+        uploader_id=user.id,
+        subject_id=user.id,
+        files=[(b"\x89PNG\r\n\x1a\n bb", "b.png", "image/png")],
+        hospital_override="医院A",
+    )
+    report = service.commit_draft(
+        db_session,
+        draft_id=d1["draft_id"],
+        report_type=d1["report_type"],
+        report_type_label=d1["report_type_label"],
+        report_date=d1["report_date"],
+        hospital=d1["hospital"],
+        metrics=d1["metrics"],
+    )
+
+    dic = MedicalMetricDictionary(
+        canonical_key="wbc",
+        canonical_name="白细胞",
+        canonical_unit="10^9/L",
+        category_key="blood_routine",
+        enabled=True,
+    )
+    db_session.add(dic)
+    db_session.flush()
+    db_session.add(
+        MedicalMetricAlias(
+            owner_user_id=user.id,
+            dictionary_id=dic.id,
+            alias_name="WBC",
+            alias_unit="10^9/L",
+            hospital_hint="医院A",
+            report_type_hint=None,
+            priority=100,
+        )
+    )
+    db_session.commit()
+
+    out = service.rebuild_metric_mappings(db_session, owner_user_id=user.id)
+    assert out["mapped"] >= 1
+
+    metric_id = report.metrics[0].id
+    mapping = db_session.query(MedicalReportMetricMap).filter_by(report_metric_id=metric_id).first()
+    assert mapping is not None
+    assert mapping.match_status == "auto"
+    assert mapping.dictionary_id == dic.id
+
+
+def test_metric_trend_supports_dictionary_id(db_session, user, tmp_upload, monkeypatch):
+    from app.modules.medical import router
+
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
+
+    d1 = service.create_draft_from_images(
+        db_session,
+        uploader_id=user.id,
+        subject_id=user.id,
+        files=[(b"\x89PNG\r\n\x1a\n cc", "c.png", "image/png")],
+        hospital_override="医院A",
+    )
+    report = service.commit_draft(
+        db_session,
+        draft_id=d1["draft_id"],
+        report_type=d1["report_type"],
+        report_type_label=d1["report_type_label"],
+        report_date=d1["report_date"],
+        hospital=d1["hospital"],
+        metrics=d1["metrics"],
+    )
+
+    dic = MedicalMetricDictionary(
+        canonical_key="wbc",
+        canonical_name="白细胞",
+        canonical_unit="10^9/L",
+        category_key="blood_routine",
+        enabled=True,
+    )
+    db_session.add(dic)
+    db_session.flush()
+    db_session.add(
+        MedicalMetricAlias(
+            owner_user_id=user.id,
+            dictionary_id=dic.id,
+            alias_name="WBC",
+            alias_unit="10^9/L",
+            hospital_hint="医院A",
+            report_type_hint=None,
+            priority=100,
+        )
+    )
+    db_session.commit()
+
+    service.rebuild_metric_mappings(db_session, owner_user_id=user.id)
+    membership = user_service.get_active_membership(db_session, user_id=user.id)
+    out = router.metric_trend(
+        dictionary_id=dic.id,
+        item_code=None,
+        item_name=None,
+        subject_id=user.id,
+        db=db_session,
+        user=user,
+        membership=membership,
+    )
+
+    assert out.data is not None
+    assert out.data.dictionary_id == dic.id
+    assert out.data.category_key == "blood_routine"
+    assert out.data.item_name == "白细胞"
+    assert len(out.data.points) >= 1
+    assert out.data.points[0].report_id == report.id
+
+
+def test_metric_catalog_supports_mapped_and_category_filter(db_session, user, tmp_upload, monkeypatch):
+    from app.modules.medical import router
+
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
+
+    d1 = service.create_draft_from_images(
+        db_session,
+        uploader_id=user.id,
+        subject_id=user.id,
+        files=[(b"\x89PNG\r\n\x1a\n dd", "d.png", "image/png")],
+        hospital_override="医院A",
+    )
+    service.commit_draft(
+        db_session,
+        draft_id=d1["draft_id"],
+        report_type=d1["report_type"],
+        report_type_label=d1["report_type_label"],
+        report_date=d1["report_date"],
+        hospital=d1["hospital"],
+        metrics=d1["metrics"],
+    )
+
+    dic = MedicalMetricDictionary(
+        canonical_key="wbc",
+        canonical_name="白细胞",
+        canonical_unit="10^9/L",
+        category_key="blood_routine",
+        enabled=True,
+    )
+    db_session.add(dic)
+    db_session.flush()
+    db_session.add(
+        MedicalMetricAlias(
+            owner_user_id=user.id,
+            dictionary_id=dic.id,
+            alias_name="WBC",
+            alias_unit="10^9/L",
+            hospital_hint="医院A",
+            report_type_hint=None,
+            priority=100,
+        )
+    )
+    db_session.commit()
+
+    service.rebuild_metric_mappings(db_session, owner_user_id=user.id)
+    membership = user_service.get_active_membership(db_session, user_id=user.id)
+    out = router.metric_catalog(
+        subject_id=user.id,
+        mapped=1,
+        category_key="blood_routine",
+        db=db_session,
+        user=user,
+        membership=membership,
+    )
+
+    assert out.data is not None
+    assert len(out.data.items) >= 1
+    assert out.data.items[0].dictionary_id == dic.id
+    assert out.data.items[0].category_key == "blood_routine"
 

@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-- 主线阶段：体验版稳定性回归完成，进入下一轮能力升级准备。
-- 已落地：趋势页改为单成员优先浏览；历史页默认本人 + 近 3 个月 + 医院结果联动筛选；上传页与权限设置页 UI/UX 已重构；登录/请求基础设施与版本校验也做了对应收口。
-- 部署状态：后端已发布到 NAS，Alembic 版本 `d5a9e1c7b2f4`；本轮后端改动不需要重建数据库。
+- 主线阶段：P0 浏览收口完成后，已推进“关注指标 / 检查单分类 / 医院映射”设置链路收口。
+- 已落地：关注指标空状态支持自动 bootstrap/rebuild 恢复；设置页恢复为三项独立入口（成员权限、我的关注指标、我的检查单分类）；医院映射下沉到“我的关注指标”二级；分类列表操作样式已改为右侧紧凑图标按钮。
+- 部署状态：后端已发布到 NAS，Alembic 版本 `f3b1c2d4e5a6`；本轮变更已完成部署脚本与 `/health` 验证。
 
 ## 现场反馈评估（2026-06-25）
 
@@ -28,9 +28,12 @@
 | P0 | done | TKT-003 | 上传成功后导航回流优化 | `docs/tickets/TKT-003-post-submit-navigation.md` |
 | P0 | done | TKT-004 | 就医权限默认未向家庭成员全开 | `docs/tickets/TKT-004-family-visibility-guidance.md` |
 | P0 | done | TKT-010 | 就医成员选择器 UI/UX 与权限联动统一 | `docs/tickets/TKT-010-unified-member-filter-ux.md` |
-| P1 | todo | TKT-006 | 关注指标体系与医院自动识别主路径 | `docs/tickets/TKT-006-focus-metrics-and-hospital-recognition.md` |
-| P1 | todo | TKT-007 | 检查单类别识别与关注指标联动 | `docs/tickets/TKT-007-report-category-recognition.md` |
-| P1 | done | TKT-008 | 就医浏览体验真机验收与交互微调 | `docs/tickets/TKT-008-medical-browsing-device-polish.md` |
+| P0 | todo | TKT-006 | 关注指标体系与医院自动识别主路径 | `docs/tickets/TKT-006-focus-metrics-and-hospital-recognition.md` |
+| P0 | todo | TKT-007 | 检查单类别识别与关注指标联动 | `docs/tickets/TKT-007-report-category-recognition.md` |
+| P0 | todo | TKT-013 | 一次上传多类检查单只识别一张 | `docs/tickets/TKT-013-multi-category-upload-recognition.md` |
+| P0 | todo | TKT-011 | 指标趋势图横坐标最后日期显示不全 | `docs/tickets/TKT-011-trend-axis-date-clipping.md` |
+| P1 | todo | TKT-012 | 项目看板与 Ticket 管理基础设施 | `docs/tickets/TKT-012-project-kanban-management.md` |
+| P0 | done | TKT-008 | 就医浏览体验真机验收与交互微调 | `docs/tickets/TKT-008-medical-browsing-device-polish.md` |
 | P0 | done | TKT-009 | 趋势图点按缺少数值 tooltip | `docs/tickets/TKT-009-trend-point-tooltip.md` |
 
 ### 已完成 / 已验收
@@ -45,8 +48,8 @@
 
 ### 候选池（未升格成 active ticket）
 
-- P2：AI 助手能力迭代。
-- P2：更多报告类型适配与指标标准化词典完善。
+- P1：AI 助手能力迭代。
+- P1：更多报告类型适配与指标标准化词典完善。
 
 进入 active backlog 前，先按 `docs/tickets/TICKET_TEMPLATE.md` 建 ticket，再回写到上表。
 ## 建议执行顺序（当前 P0）

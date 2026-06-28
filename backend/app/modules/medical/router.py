@@ -14,13 +14,32 @@ from app.core.user.models import FamilyMembership
 from app.core.schemas_base import ApiResponse
 from app.core.user.models import User
 from app.modules.medical import service
-from app.modules.medical.models import MedicalReport, MedicalReportMetric
+from app.modules.medical.models import (
+    MedicalMetricDictionary,
+    MedicalReport,
+    MedicalReportMetric,
+    MedicalReportMetricMap,
+)
 from app.modules.medical.schemas import (
     CatalogItem,
     CatalogOut,
+    CategoryCreateIn,
+    CategoryListOut,
+    CategoryOut,
+    CategoryUpdateIn,
+    BootstrapOut,
     DraftCommitIn,
     DraftMetric,
     DraftOut,
+    FocusMetricListOut,
+    FocusMetricOut,
+    FocusMetricUpdateIn,
+    FocusMetricUpsertIn,
+    MappingAliasCreateIn,
+    MappingAliasListOut,
+    MappingAliasOut,
+    MappingAliasUpdateIn,
+    MappingRebuildOut,
     MedicalAclGrantIn,
     MedicalAclGrantOut,
     MedicalAclListOut,
@@ -116,6 +135,76 @@ def _owner_acl_out(db: Session, membership: FamilyMembership, owner_user_id: int
     )
 
 
+def _category_list_out(db: Session, user: User) -> CategoryListOut:
+    rows = service.list_user_categories(db, user_id=user.id)
+    return CategoryListOut(
+        items=[
+            CategoryOut(
+                id=row.id,
+                category_key=row.category_key,
+                display_name=row.display_name,
+            )
+            for row in rows
+        ]
+    )
+
+
+def _focus_metric_list_out(db: Session, user: User) -> FocusMetricListOut:
+    rows = service.list_user_focus_metric_details(db, user_id=user.id)
+    categories = service.list_user_categories(db, user_id=user.id)
+    category_by_key = {c.category_key: c for c in categories}
+    return FocusMetricListOut(
+        items=[
+            FocusMetricOut(
+                id=focus.id,
+                dictionary_id=focus.dictionary_id,
+                category_id=category_by_key[focus.category_key].id if focus.category_key in category_by_key else None,
+                category_key=focus.category_key,
+                category_name=category_by_key[focus.category_key].display_name if focus.category_key in category_by_key else None,
+                canonical_key=dic.canonical_key,
+                canonical_name=dic.canonical_name,
+                canonical_unit=dic.canonical_unit,
+            )
+            for focus, dic in rows
+        ]
+    )
+
+
+def _mapping_alias_list_out(
+    db: Session,
+    *,
+    user: User,
+    hospital_hint: str | None,
+    category_key: str | None,
+    dictionary_id: int | None,
+) -> MappingAliasListOut:
+    rows = service.list_metric_alias_details(
+        db,
+        owner_user_id=user.id,
+        hospital_hint=hospital_hint,
+        category_key=category_key,
+        dictionary_id=dictionary_id,
+    )
+    return MappingAliasListOut(
+        items=[
+            MappingAliasOut(
+                id=alias.id,
+                owner_user_id=alias.owner_user_id,
+                dictionary_id=alias.dictionary_id,
+                alias_name=alias.alias_name,
+                alias_unit=alias.alias_unit,
+                hospital_hint=alias.hospital_hint,
+                report_type_hint=alias.report_type_hint,
+                priority=alias.priority,
+                canonical_name=dic.canonical_name,
+                canonical_unit=dic.canonical_unit,
+                category_key=dic.category_key,
+            )
+            for alias, dic in rows
+        ]
+    )
+
+
 @router.get("/permissions", response_model=ApiResponse[MedicalAclListOut])
 def get_my_acl(
     owner_user_id: int | None = Query(default=None),
@@ -150,6 +239,246 @@ def set_my_acl(
         actions=body.actions,
     )
     return ApiResponse.ok(_owner_acl_out(db, membership, user.id))
+
+
+@router.get("/categories", response_model=ApiResponse[CategoryListOut])
+def list_categories(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
+):
+    _ = membership
+    return ApiResponse.ok(_category_list_out(db, user))
+
+
+@router.post("/categories", response_model=ApiResponse[CategoryListOut])
+def create_category(
+    body: CategoryCreateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
+):
+    _ = membership
+    try:
+        service.create_user_category(db, user_id=user.id, display_name=body.display_name)
+    except ValueError as e:
+        raise PikaException(str(e), code=400)
+    return ApiResponse.ok(_category_list_out(db, user))
+
+
+@router.patch("/categories/{category_id}", response_model=ApiResponse[CategoryListOut])
+def rename_category(
+    category_id: int,
+    body: CategoryUpdateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
+):
+    _ = membership
+    try:
+        service.rename_user_category(
+            db,
+            user_id=user.id,
+            category_id=category_id,
+            display_name=body.display_name,
+        )
+    except ValueError as e:
+        raise PikaException(str(e), code=400)
+    return ApiResponse.ok(_category_list_out(db, user))
+
+
+@router.delete("/categories/{category_id}", response_model=ApiResponse[CategoryListOut])
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
+):
+    _ = membership
+    ok = service.disable_user_category(db, user_id=user.id, category_id=category_id)
+    if not ok:
+        raise NotFoundError("category not found")
+    return ApiResponse.ok(_category_list_out(db, user))
+
+
+@router.get("/focus-metrics", response_model=ApiResponse[FocusMetricListOut])
+def list_focus_metrics(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return ApiResponse.ok(_focus_metric_list_out(db, user))
+
+
+@router.post("/focus-metrics", response_model=ApiResponse[FocusMetricListOut])
+def create_focus_metric(
+    body: FocusMetricUpsertIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        service.create_user_focus_metric(
+            db,
+            user_id=user.id,
+            dictionary_id=body.dictionary_id,
+            category_id=body.category_id,
+        )
+    except ValueError as e:
+        raise PikaException(str(e), code=400)
+    return ApiResponse.ok(_focus_metric_list_out(db, user))
+
+
+@router.patch("/focus-metrics/{focus_id}", response_model=ApiResponse[FocusMetricListOut])
+def update_focus_metric(
+    focus_id: int,
+    body: FocusMetricUpdateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        service.update_user_focus_metric_category(
+            db,
+            user_id=user.id,
+            focus_id=focus_id,
+            category_id=body.category_id,
+        )
+    except ValueError as e:
+        raise PikaException(str(e), code=400)
+    return ApiResponse.ok(_focus_metric_list_out(db, user))
+
+
+@router.delete("/focus-metrics/{focus_id}", response_model=ApiResponse[FocusMetricListOut])
+def delete_focus_metric(
+    focus_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    ok = service.delete_user_focus_metric(db, user_id=user.id, focus_id=focus_id)
+    if not ok:
+        raise NotFoundError("focus metric not found")
+    return ApiResponse.ok(_focus_metric_list_out(db, user))
+
+
+@router.post("/mappings/bootstrap", response_model=ApiResponse[BootstrapOut])
+def bootstrap_mappings(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
+):
+    _ = membership
+    out = service.bootstrap_metric_dictionary(db, owner_user_id=user.id)
+    return ApiResponse.ok(BootstrapOut(**out))
+
+
+@router.post("/mappings/rebuild", response_model=ApiResponse[MappingRebuildOut])
+def rebuild_mappings(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    membership: FamilyMembership = Depends(get_current_membership),
+):
+    _ = membership
+    out = service.rebuild_metric_mappings(db, owner_user_id=user.id)
+    return ApiResponse.ok(MappingRebuildOut(**out))
+
+
+@router.get("/mappings/aliases", response_model=ApiResponse[MappingAliasListOut])
+def list_mapping_aliases(
+    hospital_hint: str | None = Query(default=None),
+    category_key: str | None = Query(default=None),
+    dictionary_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return ApiResponse.ok(
+        _mapping_alias_list_out(
+            db,
+            user=user,
+            hospital_hint=hospital_hint,
+            category_key=category_key,
+            dictionary_id=dictionary_id,
+        )
+    )
+
+
+@router.post("/mappings/aliases", response_model=ApiResponse[MappingAliasListOut])
+def create_mapping_alias(
+    body: MappingAliasCreateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        service.create_metric_alias(
+            db,
+            owner_user_id=user.id,
+            dictionary_id=body.dictionary_id,
+            alias_name=body.alias_name,
+            alias_unit=body.alias_unit,
+            hospital_hint=body.hospital_hint,
+            priority=body.priority,
+        )
+    except ValueError as e:
+        raise PikaException(str(e), code=400)
+
+    return ApiResponse.ok(
+        _mapping_alias_list_out(
+            db,
+            user=user,
+            hospital_hint=None,
+            category_key=None,
+            dictionary_id=None,
+        )
+    )
+
+
+@router.patch("/mappings/aliases/{alias_id}", response_model=ApiResponse[MappingAliasListOut])
+def update_mapping_alias(
+    alias_id: int,
+    body: MappingAliasUpdateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        service.update_metric_alias(
+            db,
+            owner_user_id=user.id,
+            alias_id=alias_id,
+            alias_name=body.alias_name,
+            alias_unit=body.alias_unit,
+            hospital_hint=body.hospital_hint,
+            priority=body.priority,
+        )
+    except ValueError as e:
+        raise PikaException(str(e), code=400)
+
+    return ApiResponse.ok(
+        _mapping_alias_list_out(
+            db,
+            user=user,
+            hospital_hint=None,
+            category_key=None,
+            dictionary_id=None,
+        )
+    )
+
+
+@router.delete("/mappings/aliases/{alias_id}", response_model=ApiResponse[MappingAliasListOut])
+def delete_mapping_alias(
+    alias_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    ok = service.delete_metric_alias(db, owner_user_id=user.id, alias_id=alias_id)
+    if not ok:
+        raise NotFoundError("alias not found")
+
+    return ApiResponse.ok(
+        _mapping_alias_list_out(
+            db,
+            user=user,
+            hospital_hint=None,
+            category_key=None,
+            dictionary_id=None,
+        )
+    )
 
 
 @router.post("/reports", response_model=ApiResponse[ReportDetailOut])
@@ -463,6 +792,7 @@ def get_report_image(
 
 @router.get("/metrics/trend", response_model=ApiResponse[TrendOut])
 def metric_trend(
+    dictionary_id: int | None = Query(default=None),
     item_code: str | None = Query(default=None),
     item_name: str | None = Query(default=None),
     subject_id: int | None = Query(default=None),
@@ -470,6 +800,9 @@ def metric_trend(
     user: User = Depends(get_current_user),
     membership: FamilyMembership = Depends(get_current_membership),
 ):
+    if not isinstance(dictionary_id, int):
+        dictionary_id = None
+
     family_user_ids = _family_user_ids(db, membership)
     visible_owner_ids = [
         uid for uid in family_user_ids
@@ -478,6 +811,8 @@ def metric_trend(
     if not visible_owner_ids:
         return ApiResponse.ok(
             TrendOut(
+                dictionary_id=dictionary_id,
+                category_key=None,
                 item_code=item_code,
                 item_name=item_name or "",
                 unit=None,
@@ -485,6 +820,71 @@ def metric_trend(
                 ref_high=None,
                 has_mixed_reference=False,
                 points=[],
+            )
+        )
+
+    if dictionary_id is not None:
+        q = (
+            db.query(MedicalReportMetric, MedicalReport, MedicalMetricDictionary)
+            .join(MedicalReportMetricMap, MedicalReportMetricMap.report_metric_id == MedicalReportMetric.id)
+            .join(MedicalMetricDictionary, MedicalMetricDictionary.id == MedicalReportMetricMap.dictionary_id)
+            .join(MedicalReport, MedicalReportMetric.report_id == MedicalReport.id)
+            .filter(
+                MedicalReportMetricMap.dictionary_id == dictionary_id,
+                or_(
+                    MedicalReport.subject_id.in_(visible_owner_ids),
+                    and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(visible_owner_ids)),
+                ),
+            )
+        )
+        if subject_id is not None:
+            _ensure_subject_in_family(db, user, subject_id)
+            _require_action_on_owner(db, user, subject_id, "view_report")
+            q = q.filter(MedicalReport.subject_id == subject_id)
+
+        rows = q.order_by(
+            MedicalReport.report_date.is_(None),
+            MedicalReport.report_date.asc(),
+            MedicalReport.created_at.asc(),
+            MedicalReport.id.asc(),
+            MedicalReportMetric.seq.asc(),
+        ).all()
+
+        reference_keys = {
+            (metric.ref_low, metric.ref_high, metric.ref_range)
+            for metric, _, _ in rows
+        }
+        has_mixed_reference = len(reference_keys) > 1
+
+        points = [
+            TrendPoint(
+                report_date=rep.report_date,
+                value_text=metric.value_text,
+                value_num=metric.value_num,
+                unit=metric.unit,
+                ref_range=metric.ref_range,
+                ref_low=metric.ref_low,
+                ref_high=metric.ref_high,
+                abnormal_flag=metric.abnormal_flag,
+                report_id=rep.id,
+                hospital=rep.hospital,
+            )
+            for metric, rep, _ in rows
+        ]
+        first_metric = rows[0][0] if rows else None
+        last_metric = rows[-1][0] if rows else None
+        dictionary = rows[0][2] if rows else db.get(MedicalMetricDictionary, dictionary_id)
+        return ApiResponse.ok(
+            TrendOut(
+                dictionary_id=dictionary_id,
+                category_key=dictionary.category_key if dictionary else None,
+                item_code=first_metric.item_code if first_metric else None,
+                item_name=dictionary.canonical_name if dictionary else "",
+                unit=(last_metric.unit if last_metric else (dictionary.canonical_unit if dictionary else None)),
+                ref_low=last_metric.ref_low if last_metric else None,
+                ref_high=last_metric.ref_high if last_metric else None,
+                has_mixed_reference=has_mixed_reference,
+                points=points,
             )
         )
 
@@ -540,6 +940,8 @@ def metric_trend(
     latest = rows[-1][0] if rows else None
     return ApiResponse.ok(
         TrendOut(
+            dictionary_id=None,
+            category_key=None,
             item_code=item_code or (first.item_code if first else None),
             item_name=item_name or (first.item_name if first else ""),
             unit=latest.unit if latest else (first.unit if first else None),
@@ -554,10 +956,15 @@ def metric_trend(
 @router.get("/metrics/catalog", response_model=ApiResponse[CatalogOut])
 def metric_catalog(
     subject_id: int | None = Query(default=None),
+    mapped: int = Query(default=0),
+    category_key: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     membership: FamilyMembership = Depends(get_current_membership),
 ):
+    mapped = int(mapped) if isinstance(mapped, int) else 0
+    category_key = category_key if isinstance(category_key, str) else None
+
     family_user_ids = _family_user_ids(db, membership)
     visible_owner_ids = [
         uid for uid in family_user_ids
@@ -565,6 +972,50 @@ def metric_catalog(
     ]
     if not visible_owner_ids:
         return ApiResponse.ok(CatalogOut(items=[]))
+
+    if mapped:
+        q = (
+            db.query(
+                MedicalMetricDictionary.id,
+                MedicalMetricDictionary.category_key,
+                MedicalMetricDictionary.canonical_key,
+                MedicalMetricDictionary.canonical_name,
+                func.count(MedicalReportMetric.id),
+            )
+            .join(MedicalReportMetricMap, MedicalReportMetricMap.dictionary_id == MedicalMetricDictionary.id)
+            .join(MedicalReportMetric, MedicalReportMetric.id == MedicalReportMetricMap.report_metric_id)
+            .join(MedicalReport, MedicalReportMetric.report_id == MedicalReport.id)
+            .filter(
+                or_(
+                    MedicalReport.subject_id.in_(visible_owner_ids),
+                    and_(MedicalReport.subject_id.is_(None), MedicalReport.uploader_id.in_(visible_owner_ids)),
+                )
+            )
+        )
+        if subject_id is not None:
+            _ensure_subject_in_family(db, user, subject_id)
+            _require_action_on_owner(db, user, subject_id, "view_report")
+            q = q.filter(MedicalReport.subject_id == subject_id)
+        if category_key:
+            q = q.filter(MedicalMetricDictionary.category_key == category_key)
+
+        q = q.group_by(
+            MedicalMetricDictionary.id,
+            MedicalMetricDictionary.category_key,
+            MedicalMetricDictionary.canonical_key,
+            MedicalMetricDictionary.canonical_name,
+        )
+        items = [
+            CatalogItem(
+                dictionary_id=did,
+                category_key=cat_key,
+                item_code=canon_key,
+                item_name=canon_name,
+                count=count,
+            )
+            for did, cat_key, canon_key, canon_name, count in q.all()
+        ]
+        return ApiResponse.ok(CatalogOut(items=items))
 
     q = (
         db.query(
@@ -587,7 +1038,7 @@ def metric_catalog(
     q = q.group_by(MedicalReportMetric.item_code, MedicalReportMetric.item_name)
 
     items = [
-        CatalogItem(item_code=code, item_name=name, count=count)
+        CatalogItem(dictionary_id=None, category_key=None, item_code=code, item_name=name, count=count)
         for code, name, count in q.all()
     ]
     return ApiResponse.ok(CatalogOut(items=items))

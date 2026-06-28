@@ -4,7 +4,7 @@ import re
 
 from openai import AzureOpenAI
 
-from app.modules.medical.prompts import SYSTEM_PROMPT, USER_PROMPT
+from app.modules.medical.prompts import SYSTEM_PROMPT, build_user_prompt
 from app.settings import settings
 
 _NUM_RE = re.compile(r"-?\d+(?:\.\d+)?")
@@ -99,7 +99,7 @@ def _normalize_metric(raw: dict, seq: int) -> dict | None:
     }
 
 
-def parse_report_image(image_bytes: bytes) -> tuple[dict, str]:
+def parse_report_image(image_bytes: bytes, *, category_candidates: list[str] | None = None) -> tuple[dict, str]:
     """Call GPT-4.5-mini vision and return (parsed dict, raw model text).
 
     parsed = {report_type, report_type_label, report_date, metrics:[...normalized...]}.
@@ -112,7 +112,7 @@ def parse_report_image(image_bytes: bytes) -> tuple[dict, str]:
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": USER_PROMPT},
+                    {"type": "text", "text": build_user_prompt(category_candidates)},
                     {"type": "image_url", "image_url": {"url": _data_url(image_bytes)}},
                 ],
             },

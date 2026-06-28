@@ -1,4 +1,5 @@
 from app.modules.medical import vision
+from app.modules.medical.prompts import build_user_prompt
 
 
 class TestSniffMime:
@@ -121,3 +122,14 @@ class TestLoadsLenient:
     def test_json_with_prose_prefix(self):
         text = 'Here is the result: {"x": 2} hope it helps'
         assert vision._loads_lenient(text) == {"x": 2}
+
+
+class TestBuildUserPrompt:
+    def test_returns_default_prompt_without_candidates(self):
+        out = build_user_prompt(None)
+        assert '请先判断这张图是否为检查单' in out
+
+    def test_includes_candidates_when_provided(self):
+        out = build_user_prompt(['血常规', '肝肾功能'])
+        assert '血常规、肝肾功能' in out
+        assert '分类限定候选' in out
