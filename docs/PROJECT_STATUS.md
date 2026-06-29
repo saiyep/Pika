@@ -5,6 +5,7 @@
 - 主线阶段：P0 浏览收口完成后，已推进“关注指标 / 检查单分类 / 医院映射”设置链路收口。
 - 已落地：关注指标空状态支持自动 bootstrap/rebuild 恢复；设置页恢复为三项独立入口（成员权限、我的关注指标、我的检查单分类）；医院映射下沉到“我的关注指标”二级；分类列表操作样式已改为右侧紧凑图标按钮。
 - 部署状态：后端已发布到 NAS，Alembic 版本 `f3b1c2d4e5a6`；本轮变更已完成部署脚本与 `/health` 验证。
+- 新增离线批量导入能力：已提供 `medical-bulk-import` skill + `backend/scripts/medical_bulk_import.py`，并完成 NAS 实测（目录 8 张检查单全部成功导入）。
 
 ## 现场反馈评估（2026-06-25）
 
@@ -28,11 +29,12 @@
 | P0 | done | TKT-003 | 上传成功后导航回流优化 | `docs/tickets/TKT-003-post-submit-navigation.md` |
 | P0 | done | TKT-004 | 就医权限默认未向家庭成员全开 | `docs/tickets/TKT-004-family-visibility-guidance.md` |
 | P0 | done | TKT-010 | 就医成员选择器 UI/UX 与权限联动统一 | `docs/tickets/TKT-010-unified-member-filter-ux.md` |
-| P0 | todo | TKT-006 | 关注指标体系与医院自动识别主路径 | `docs/tickets/TKT-006-focus-metrics-and-hospital-recognition.md` |
+| P0 | in_progress | TKT-006 | 关注指标体系与医院自动识别主路径 | `docs/tickets/TKT-006-focus-metrics-and-hospital-recognition.md` |
 | P0 | todo | TKT-007 | 检查单类别识别与关注指标联动 | `docs/tickets/TKT-007-report-category-recognition.md` |
 | P0 | todo | TKT-013 | 一次上传多类检查单只识别一张 | `docs/tickets/TKT-013-multi-category-upload-recognition.md` |
 | P0 | todo | TKT-011 | 指标趋势图横坐标最后日期显示不全 | `docs/tickets/TKT-011-trend-axis-date-clipping.md` |
 | P1 | todo | TKT-012 | 项目看板与 Ticket 管理基础设施 | `docs/tickets/TKT-012-project-kanban-management.md` |
+| P1 | todo | TKT-014 | 局域网/公网后端地址自动切换 | `docs/tickets/TKT-014-auto-backend-endpoint-switch.md` |
 | P0 | done | TKT-008 | 就医浏览体验真机验收与交互微调 | `docs/tickets/TKT-008-medical-browsing-device-polish.md` |
 | P0 | done | TKT-009 | 趋势图点按缺少数值 tooltip | `docs/tickets/TKT-009-trend-point-tooltip.md` |
 
