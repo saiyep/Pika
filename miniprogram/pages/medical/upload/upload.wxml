@@ -6,10 +6,9 @@
 
   <block wx:if="{{step === 'pick'}}">
     <view class="select-card">
-      <text class="section-title">被检查人</text>
       <picker mode="selector" range="{{memberLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">
         <view class="picker-row">
-          <text class="picker-label">当前成员</text>
+          <text class="picker-label">检查成员</text>
           <text class="picker-value">{{memberLabels[subjectIndex] || '（未登录成员）'}} ▾</text>
         </view>
       </picker>
@@ -53,11 +52,10 @@
       <text class="section-title">确认检查信息</text>
       <view class="summary-hint">请核对识别结果，补全必填信息后再保存。</view>
       <view class="section mini">
-        <text class="section-title required">* 被检查人</text>
         <picker mode="selector" range="{{memberLabels}}" value="{{subjectIndex}}" bindchange="onSubjectPick">
           <view class="picker-row">
-            <text class="picker-label">当前成员</text>
-            <text class="picker-value">{{memberLabels[subjectIndex] || '请选择被检查人'}} ▾</text>
+            <text class="picker-label">检查成员</text>
+            <text class="picker-value">{{memberLabels[subjectIndex] || '请选择检查成员'}} ▾</text>
           </view>
         </picker>
       </view>

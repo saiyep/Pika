@@ -557,6 +557,15 @@ def commit_report_draft(
     membership: FamilyMembership = Depends(get_current_membership),
 ):
     _ = membership
+    draft = service.get_draft(draft_id)
+    if not draft:
+        raise NotFoundError("draft not found or expired")
+
+    effective_subject_id = body.subject_id if body.subject_id is not None else draft.get("subject_id")
+    _ensure_subject_in_family(db, user, effective_subject_id)
+    owner_user_id = effective_subject_id or draft.get("uploader_id")
+    _require_action_on_owner(db, user, owner_user_id, "upload_for_owner")
+
     try:
         report = service.commit_draft(
             db,
@@ -566,6 +575,7 @@ def commit_report_draft(
             report_date=body.report_date,
             hospital=body.hospital,
             metrics=[m.model_dump() for m in body.metrics],
+            subject_id=body.subject_id,
         )
     except ValueError as e:
         raise NotFoundError(str(e))

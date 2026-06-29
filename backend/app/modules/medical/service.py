@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core import storage
 from app.core.exceptions import DuplicateReportError
 from app.core.user import service as user_service
+from app.core.user.models import FamilyMembership, User
 from app.modules.medical import vision
 from app.modules.medical.models import (
     MedicalAclGrant,
@@ -204,15 +205,18 @@ def commit_draft(
     report_date: date | None,
     hospital: str | None,
     metrics: list[dict],
+    subject_id: int | None = None,
 ) -> MedicalReport:
     draft = get_draft(draft_id)
     if not draft:
         raise ValueError("draft not found or expired")
 
+    final_subject_id = subject_id if subject_id is not None else draft["subject_id"]
+
     report = _persist_report(
         db,
         uploader_id=draft["uploader_id"],
-        subject_id=draft["subject_id"],
+        subject_id=final_subject_id,
         image_paths=draft["image_paths"],
         report_type=report_type or "unknown",
         report_type_label=report_type_label,
@@ -438,6 +442,20 @@ def has_acl_action(
     return action in actions
 
 
+def _active_family_id(db: Session, *, user_id: int) -> int:
+    membership = (
+        db.query(FamilyMembership)
+        .filter(FamilyMembership.user_id == user_id, FamilyMembership.is_active.is_(True))
+        .first()
+    )
+    if membership is None:
+        user = db.get(User, user_id)
+        if user is None:
+            raise ValueError("user not found")
+        membership = user_service.ensure_user_family(db, user=user)
+    return membership.family_id
+
+
 def ensure_user_categories(db: Session, *, user_id: int) -> None:
     exists = (
         db.query(MedicalReportCategory.id)
@@ -447,9 +465,12 @@ def ensure_user_categories(db: Session, *, user_id: int) -> None:
     if exists:
         return
 
+    family_id = _active_family_id(db, user_id=user_id)
+
     for key, display_name, sort_order in MEDICAL_CATEGORY_DEFAULTS:
         db.add(
             MedicalReportCategory(
+                family_id=family_id,
                 user_id=user_id,
                 category_key=key,
                 display_name=display_name,
@@ -492,7 +513,10 @@ def create_user_category(db: Session, *, user_id: int, display_name: str) -> Med
     if not clean_name:
         raise ValueError("display_name required")
 
+    family_id = _active_family_id(db, user_id=user_id)
+
     category = MedicalReportCategory(
+        family_id=family_id,
         user_id=user_id,
         category_key=f"custom_{uuid.uuid4().hex[:8]}",
         display_name=clean_name,

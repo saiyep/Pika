@@ -45,10 +45,11 @@ Page({
     reportDate: '',
     hospital: '',
     metrics: [],
-    // 被检查人（报告属于谁）
+    // 检查成员（报告归属）
     members: [],
     memberLabels: [],
     subjectIndex: 0,
+    selectedSubjectId: '',
   },
 
   onShow() {
@@ -59,13 +60,22 @@ Page({
     request({ url: '/api/user/members' })
       .then((data) => {
         const members = (data.items || []).filter((m) => m.status !== 'disabled');
+        const memberLabels = members.map((m) => m.nickname || ('用户' + m.id));
         const myId = (getApp().globalData.user && getApp().globalData.user.id) || null;
-        let idx = members.findIndex((m) => m.id === myId);
-        if (idx < 0) idx = 0;
+        const prevSelectedId =
+          this.data.selectedSubjectId
+          || (this.data.members[this.data.subjectIndex] && this.data.members[this.data.subjectIndex].id)
+          || null;
+
+        let idx = members.findIndex((m) => m.id === prevSelectedId);
+        if (idx < 0 && myId != null) idx = members.findIndex((m) => m.id === myId);
+        if (idx < 0 && members.length) idx = 0;
+
         this.setData({
           members,
-          memberLabels: members.map((m) => m.nickname || ('用户' + m.id)),
-          subjectIndex: idx,
+          memberLabels,
+          subjectIndex: idx >= 0 ? idx : 0,
+          selectedSubjectId: idx >= 0 && members[idx] ? members[idx].id : '',
         });
       })
       .catch(() => {
@@ -74,10 +84,18 @@ Page({
   },
 
   onSubjectPick(e) {
-    this.setData({ subjectIndex: Number(e.detail.value) });
+    const subjectIndex = Number(e.detail.value);
+    const subject = this.data.members[subjectIndex];
+    this.setData({
+      subjectIndex,
+      selectedSubjectId: subject ? subject.id : '',
+    });
   },
 
   subjectId() {
+    if (this.data.selectedSubjectId !== '' && this.data.selectedSubjectId != null) {
+      return this.data.selectedSubjectId;
+    }
     const m = this.data.members[this.data.subjectIndex];
     return m ? m.id : '';
   },
@@ -275,7 +293,7 @@ Page({
     const reportDate = (this.data.reportDate || '').trim();
 
     if (!subjectId) {
-      wx.showToast({ title: '请选择被检查人', icon: 'none' });
+      wx.showToast({ title: '请选择检查成员', icon: 'none' });
       return;
     }
     if (!hospital) {
@@ -299,6 +317,7 @@ Page({
       url: `/api/medical/report-drafts/${this.data.draftId}/commit`,
       method: 'POST',
       data: {
+        subject_id: subjectId,
         report_type: reportType,
         report_type_label: reportTypeLabel,
         report_date: reportDate,

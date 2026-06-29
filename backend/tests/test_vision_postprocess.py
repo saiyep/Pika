@@ -133,3 +133,11 @@ class TestBuildUserPrompt:
         out = build_user_prompt(['血常规', '肝肾功能'])
         assert '血常规、肝肾功能' in out
         assert '分类限定候选' in out
+
+    def test_enforces_chinese_name_priority(self):
+        from app.modules.medical import prompts
+
+        assert 'item_name 必须优先返回报告单里出现的中文指标名' in prompts.SYSTEM_PROMPT
+        assert '若同一行同时有中英名称' in prompts.SYSTEM_PROMPT
+        assert 'item_name 一律输出中文名' in prompts.SYSTEM_PROMPT
+        assert '不要输出 K/Na/Cl/CO2/ALT/AST/TBIL/DBIL/GGT 作为 item_name' in prompts.SYSTEM_PROMPT

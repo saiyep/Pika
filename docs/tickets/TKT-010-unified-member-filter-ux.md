@@ -86,6 +86,12 @@
 - 已完成：四个入口的成员选择体验基本统一，权限页与默认全开策略一致。
 - 阻塞 / 问题：无。
 
+### 2026-06-28 / loop 3
+- 本轮目标：修复上传页“检查成员”在识别后被重置为本人，以及确认页改成员后提交仍落到本人的回归问题。
+- 已完成：上传页成员选择改为按成员 ID 保持，不再在 `onShow` 强制回退本人；commit 接口新增并接收 `subject_id`，保存时以用户当前选择为准；成员归属不从 OCR 结果推断；文案统一为单行“检查成员”。
+- 验证：`cd backend && pytest tests/test_medical_service.py -k subject_id`（通过），`cd backend && pytest`（78 passed）。
+- 阻塞 / 问题：无。
+
 ## 相关文件
 
 - `docs/PROJECT_STATUS.md`

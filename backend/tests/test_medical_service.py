@@ -167,7 +167,7 @@ def test_delete_missing_report_returns_false(db_session):
     assert service.delete_report(db_session, report_id=99999) is False
 
 
-def _commit(db_session, draft):
+def _commit(db_session, draft, *, subject_id=None, metrics=None):
     return service.commit_draft(
         db_session,
         draft_id=draft["draft_id"],
@@ -175,7 +175,8 @@ def _commit(db_session, draft):
         report_type_label=draft["report_type_label"],
         report_date=draft["report_date"],
         hospital=draft["hospital"],
-        metrics=draft["metrics"],
+        metrics=draft["metrics"] if metrics is None else metrics,
+        subject_id=subject_id,
     )
 
 
@@ -370,17 +371,22 @@ def test_update_missing_report_returns_none(db_session):
     ) is None
 
 
+def _create_family_member(db_session, owner_user, *, openid, nickname):
+    member = User(openid=openid, nickname=nickname, role="member", account_type="wechat", status="active")
+    db_session.add(member)
+    db_session.commit()
+    db_session.refresh(member)
+
+    owner_m = user_service.get_active_membership(db_session, user_id=owner_user.id)
+    assert owner_m is not None
+    db_session.add(FamilyMembership(family_id=owner_m.family_id, user_id=member.id, family_role="member", is_active=True))
+    db_session.commit()
+    return member
+
+
 def test_subject_id_flows_draft_to_committed_report(db_session, user, tmp_upload, monkeypatch):
     # A second family member who is the subject of the report.
-    mom = User(openid="mom-openid", nickname="妈妈", role="member", account_type="wechat", status="active")
-    db_session.add(mom)
-    db_session.commit()
-    db_session.refresh(mom)
-
-    owner_m = user_service.get_active_membership(db_session, user_id=user.id)
-    assert owner_m is not None
-    db_session.add(FamilyMembership(family_id=owner_m.family_id, user_id=mom.id, family_role="member", is_active=True))
-    db_session.commit()
+    mom = _create_family_member(db_session, user, openid="mom-openid", nickname="妈妈")
 
     monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
     draft = service.create_draft_from_images(
@@ -393,6 +399,50 @@ def test_subject_id_flows_draft_to_committed_report(db_session, user, tmp_upload
     # Report belongs to mom (subject), uploaded by user.
     assert report.subject_id == mom.id
     assert report.uploader_id == user.id
+
+
+def test_commit_draft_subject_id_override_wins(db_session, user, tmp_upload, monkeypatch):
+    mom = _create_family_member(db_session, user, openid="mom-openid-2", nickname="妈妈")
+    dad = _create_family_member(db_session, user, openid="dad-openid", nickname="爸爸")
+
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (_FAKE_PARSED, "{}"))
+    draft = service.create_draft_from_images(
+        db_session,
+        uploader_id=user.id,
+        subject_id=mom.id,
+        files=[(b"\x89PNG\r\n\x1a\n subj-override", "a.png", "image/png")],
+        hospital_override="X",
+    )
+
+    report = _commit(db_session, draft, subject_id=dad.id)
+    assert report.subject_id == dad.id
+    assert report.uploader_id == user.id
+
+
+def test_commit_draft_subject_is_not_derived_from_ocr_payload(db_session, user, tmp_upload, monkeypatch):
+    mom = _create_family_member(db_session, user, openid="mom-openid-3", nickname="妈妈")
+
+    parsed = {
+        **_FAKE_PARSED,
+        "metrics": [{
+            "item_name": "妈妈", "item_code": "PATIENT", "value_text": "被识别的人名",
+            "value_num": None, "unit": None, "ref_range": None,
+            "ref_low": None, "ref_high": None, "abnormal_flag": "unknown", "seq": 0,
+        }],
+    }
+    monkeypatch.setattr(vision, "parse_report_image", lambda b, **kwargs: (parsed, "{\"subject\":\"ocr-name\"}"))
+
+    draft = service.create_draft_from_images(
+        db_session,
+        uploader_id=user.id,
+        subject_id=mom.id,
+        files=[(b"\x89PNG\r\n\x1a\n subj-ocr", "a.png", "image/png")],
+        hospital_override="X",
+    )
+
+    report = _commit(db_session, draft)
+    assert report.subject_id == mom.id
+    assert report.metrics[0].item_name == "妈妈"
 
 
 def test_list_filter_by_subject(db_session, user, tmp_upload, monkeypatch):
@@ -419,6 +469,23 @@ def test_list_filter_by_subject(db_session, user, tmp_upload, monkeypatch):
     mom_reports = db_session.query(MedicalReport).filter_by(subject_id=mom.id).all()
     assert len(mom_reports) == 1
     assert mom_reports[0].subject_id == mom.id
+
+
+def test_ensure_user_categories_sets_family_id(db_session, user):
+    service.ensure_user_categories(db_session, user_id=user.id)
+    categories = service.list_user_categories(db_session, user_id=user.id)
+    assert categories
+
+    membership = user_service.get_active_membership(db_session, user_id=user.id)
+    assert membership is not None
+    assert all(c.family_id == membership.family_id for c in categories)
+
+
+def test_create_user_category_sets_family_id(db_session, user):
+    category = service.create_user_category(db_session, user_id=user.id, display_name="自定义分类")
+    membership = user_service.get_active_membership(db_session, user_id=user.id)
+    assert membership is not None
+    assert category.family_id == membership.family_id
 
 
 def test_medical_acl_actions(db_session, user):

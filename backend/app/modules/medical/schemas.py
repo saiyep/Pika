@@ -116,6 +116,7 @@ class DraftOut(BaseModel):
 
 
 class DraftCommitIn(BaseModel):
+    subject_id: int | None = None
     report_type: str = "unknown"
     report_type_label: str | None = None
     report_date: date | None = None
